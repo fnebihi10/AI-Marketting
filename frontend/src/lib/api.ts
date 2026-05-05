@@ -26,8 +26,8 @@ export interface VideoJob {
   description: string;
   productCategory?: string;
   style: string;
-  enableStyleTransfer: boolean;
   imageUrl?: string;
+  imageUrls?: string[];
   createdAt: string;
   script?: {
     title?: string;
@@ -65,6 +65,8 @@ export interface PhotoJob {
   source: 'upload' | 'prompt';
   imagePath?: string;
   imageUrl?: string;
+  imageUrls?: string[];
+  caption?: string;
   createdAt: string;
   output?: {
     variants?: Array<{ url: string; localPath?: string }>;
@@ -154,20 +156,20 @@ export const resetPassword = async (token: string, password: string) => {
 };
 
 export const createJob = async (payload: {
-  image?: File | null;
+  images?: File[] | null;
   description: string;
   productCategory: string;
   style: string;
-  enableStyleTransfer: boolean;
 }) => {
   const formData = new FormData();
-  if (payload.image) {
-    formData.append('image', payload.image);
+  if (payload.images && payload.images.length > 0) {
+    payload.images.forEach((file) => {
+      formData.append('images', file);
+    });
   }
   formData.append('description', payload.description);
   formData.append('productCategory', payload.productCategory);
   formData.append('style', payload.style);
-  formData.append('enableStyleTransfer', String(payload.enableStyleTransfer));
 
   const response = await fetch(`${API_BASE}/jobs`, {
     method: 'POST',
@@ -185,14 +187,16 @@ export const createJob = async (payload: {
 };
 
 export const createPhotoJob = async (payload: {
-  image?: File | null;
+  images?: File[] | null;
   description: string;
   productCategory: string;
   style: string;
 }) => {
   const formData = new FormData();
-  if (payload.image) {
-    formData.append('image', payload.image);
+  if (payload.images && payload.images.length > 0) {
+    payload.images.forEach((file) => {
+      formData.append('images', file);
+    });
   }
   formData.append('description', payload.description);
   formData.append('productCategory', payload.productCategory);
@@ -255,6 +259,25 @@ export const trimJob = async (jobId: string, startSeconds: number, endSeconds: n
 
   const payload = await response.json();
   return payload.data;
+};
+
+export const completePhotoJob = async (jobId: string, imageBlob: Blob) => {
+  const formData = new FormData();
+  formData.append('image', imageBlob, 'puter-generated.png');
+
+  const response = await fetch(`${API_BASE}/photo-jobs/${jobId}/complete`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Failed to complete photo job.' }));
+    throw new Error(error.message || 'Failed to complete photo job.');
+  }
+
+  const payload = await response.json();
+  return payload.data as PhotoJob;
 };
 
 export const getJobEventsUrl = (jobId: string) => `${API_BASE}/jobs/${jobId}/events`;

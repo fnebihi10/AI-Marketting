@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Eye, EyeOff, Lock, Sparkles, RefreshCcw, ArrowRight } from 'lucide-react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { ArrowRight, Eye, EyeOff, Lock, Moon, RefreshCcw, Sparkles, Sun } from 'lucide-react';
 import { resetPassword } from '../lib/api';
 import { useLanguage } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
+import BrandLogo from '../components/common/BrandLogo';
 
 const ResetPasswordPage = () => {
   const { theme, toggleTheme } = useTheme();
@@ -17,11 +18,11 @@ const ResetPasswordPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  const handleChange = (e) =>
-    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  const handleChange = (event) =>
+    setFormData((prev) => ({ ...prev, [event.target.name]: event.target.value }));
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
     setError('');
 
     const { password, confirmPassword } = formData;
@@ -30,10 +31,12 @@ const ResetPasswordPage = () => {
       setError(t('errorRequired'));
       return;
     }
+
     if (password.length < 6) {
       setError(t('errorPassLength'));
       return;
     }
+
     if (password !== confirmPassword) {
       setError(t('errorPassMatch'));
       return;
@@ -42,16 +45,12 @@ const ResetPasswordPage = () => {
     setLoading(true);
     try {
       const payload = await resetPassword(token, password);
-      
-      // If the backend returns a token and user after reset, we can log them in
+
       if (payload.token && payload.user) {
         localStorage.setItem('token', payload.token);
         localStorage.setItem('user_email', payload.user.email);
-        
-        // Use window.location.href to force a full reload and update App state
         window.location.href = '/';
       } else {
-        // Fallback: just go to login
         navigate('/');
       }
     } catch (err) {
@@ -63,19 +62,18 @@ const ResetPasswordPage = () => {
 
   return (
     <div className="auth-scene">
-      {/* Animated background orbs */}
       <div className="auth-orb auth-orb--1" />
       <div className="auth-orb auth-orb--2" />
       <div className="auth-orb auth-orb--3" />
 
-      {/* Top-right controls: Language + Theme */}
       <div className="auth-controls-row">
         <button
           className="auth-theme-toggle"
           onClick={toggleLanguage}
           aria-label="Toggle language"
+          title={lang === 'sq' ? 'Switch to English' : 'Kalo ne shqip'}
         >
-          <span style={{ fontSize: '0.85rem', fontWeight: 800, letterSpacing: '0.02em' }}>
+          <span className="text-xs font-extrabold tracking-wide">
             {lang === 'sq' ? 'EN' : 'AL'}
           </span>
         </button>
@@ -83,20 +81,18 @@ const ResetPasswordPage = () => {
           className="auth-theme-toggle"
           onClick={toggleTheme}
           aria-label="Toggle theme"
+          title={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
         >
-          {theme === 'dark' ? '☀️' : '🌙'}
+          {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
         </button>
       </div>
 
-      {/* Glass card */}
       <div className="auth-glass-card">
         <div className="auth-card-accent" />
         <div className="auth-card-body">
-
-          {/* Brand */}
           <div className="auth-brand-row">
-            <div className="auth-icon-badge">
-              <Sparkles size={20} />
+            <div className="auth-logo-wrap">
+              <BrandLogo className="h-11 w-auto" />
             </div>
             <div>
               <h1 className="auth-heading">{t('appName')}</h1>
@@ -104,18 +100,28 @@ const ResetPasswordPage = () => {
             </div>
           </div>
 
-          <p className="auth-subheading" style={{ marginBottom: '1.5rem', opacity: 0.9 }}>
+          <p className="auth-subheading mb-6">
             {t('resetSubtitle')}
           </p>
 
+          <div className="mb-6 rounded-[20px] border border-slate-200/70 bg-white/50 p-4 text-sm text-slate-600 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-300">
+            <div className="mb-1 flex items-center gap-2 font-bold text-slate-900 dark:text-white">
+              <Sparkles size={16} />
+              Password refresh
+            </div>
+            <div>
+              Use at least 6 characters and avoid reusing an old password.
+            </div>
+          </div>
+
           <form onSubmit={handleSubmit} noValidate className="auth-form">
-            <div className={`auth-field ${error && !formData.password ? 'auth-field--error' : ''}`}>
+            <div className="auth-field">
               <label htmlFor="password" className="auth-field-label">{t('newPasswordLabel')}</label>
               <div className="auth-field-inner">
                 <Lock size={16} className="auth-field-icon" />
                 <input
                   id="password"
-                  type={showPassword ? "text" : "password"}
+                  type={showPassword ? 'text' : 'password'}
                   name="password"
                   placeholder={t('passwordMinFormat')}
                   value={formData.password}
@@ -126,20 +132,21 @@ const ResetPasswordPage = () => {
                 <button
                   type="button"
                   className="auth-eye-btn"
-                  onClick={() => setShowPassword(!showPassword)}
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
             </div>
 
-            <div className={`auth-field ${error && formData.password !== formData.confirmPassword ? 'auth-field--error' : ''}`}>
+            <div className="auth-field">
               <label htmlFor="confirmPassword" className="auth-field-label">{t('confirmPasswordLabel')}</label>
               <div className="auth-field-inner">
                 <Lock size={16} className="auth-field-icon" />
                 <input
                   id="confirmPassword"
-                  type={showConfirmPassword ? "text" : "password"}
+                  type={showConfirmPassword ? 'text' : 'password'}
                   name="confirmPassword"
                   placeholder={t('passwordPlaceholder')}
                   value={formData.confirmPassword}
@@ -150,18 +157,19 @@ const ResetPasswordPage = () => {
                 <button
                   type="button"
                   className="auth-eye-btn"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  onClick={() => setShowConfirmPassword((prev) => !prev)}
+                  aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
                 >
                   {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
             </div>
 
-            {error && (
+            {error ? (
               <div className="auth-error-bar">
                 <span>{error}</span>
               </div>
-            )}
+            ) : null}
 
             <button type="submit" className="auth-submit-btn" disabled={loading}>
               {loading ? (
@@ -169,18 +177,17 @@ const ResetPasswordPage = () => {
               ) : (
                 <>
                   <span>{t('resetButton')}</span>
-                  <ArrowRight size={18} />
+                  <ArrowRight size={18} className="auth-btn-arrow" />
                 </>
               )}
             </button>
           </form>
 
-          <div className="auth-switch-text" style={{ marginTop: '1.5rem' }}>
+          <div className="auth-switch-text">
             <button
               type="button"
               onClick={() => navigate('/')}
-              className="auth-switch-link"
-              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, font: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', gap: '0.4rem' }}
+              className="auth-switch-link inline-flex items-center justify-center gap-2"
             >
               <RefreshCcw size={14} />
               {t('backToLogin')}
