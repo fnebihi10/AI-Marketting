@@ -29,17 +29,6 @@ out/
 .DS_Store
 Thumbs.db
 
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# OS
-.DS_Store
-Thumbs.db
-
 # Misc
 .gemini/
 antigravity/
@@ -54,7 +43,11 @@ frontend/.env
 backend/logs/
 backend/storage/
 frontend/logs/
+frontend/vite-dev.*
 backend/public/
+
+# Local diagnostics
+\#\# GitHub Copilot Chat.md
 
 # Local FFmpeg binaries (too large for GitHub)
 backend/tools/ffmpeg/*.exe
