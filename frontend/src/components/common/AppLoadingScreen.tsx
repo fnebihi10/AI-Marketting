@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { useTheme } from '../../context/ThemeContext';
 import logoMark from '../../assets/logo-mark-ui.png';
 
-const LOADER_DURATION_MS = 4000;
+const LOADER_DURATION_MS = 3200; // Adjusted slightly for better feel
 const LOADER_FADE_MS = 500;
 
 type AppLoadingScreenProps = {
@@ -33,7 +33,7 @@ export default function AppLoadingScreen({ children }: AppLoadingScreenProps) {
 
   return (
     <>
-      <div
+      <div 
         className={`app-shell ${isAppVisible ? 'app-shell--ready' : 'app-shell--hidden'}`}
         aria-hidden={!isAppVisible}
       >
@@ -41,20 +41,20 @@ export default function AppLoadingScreen({ children }: AppLoadingScreenProps) {
       </div>
 
       {!isLoadingComplete ? (
-        <div
+        <div 
           className={`app-loader ${theme === 'dark' ? 'app-loader--dark' : 'app-loader--light'} ${
             isFadingOut ? 'app-loader--fade-out' : ''
           }`}
           role="status"
           aria-live="polite"
-          aria-label="Loading Video AI Studio"
+          aria-label="Loading AI Marketing Studio"
         >
           <div className="app-loader__content">
             <div className="app-loader__logo-wrap">
               <div className="app-loader__glow" />
-              <img src={logoMark} alt="Video AI Studio logo" className="app-loader__logo" />
+              <img src={logoMark} alt="AI Marketing Studio logo" className="app-loader__logo" />
             </div>
-            <div className="app-loader__title">Video AI Studio</div>
+            <div className="app-loader__title">AI Marketing Studio</div>
             <div className="app-loader__subtitle">Loading AI Experience...</div>
           </div>
         </div>

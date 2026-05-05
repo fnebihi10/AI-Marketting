@@ -1,151 +1,120 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 
-// ─── Translations Dictionary ───────────────────────────────────────────────────
 const translations = {
   en: {
-    // Auth Shared
-    appName: 'AI Marketing',
+    appName: 'AI Marketing Studio',
     emailLabel: 'Email address',
     emailPlaceholder: 'you@example.com',
     passwordLabel: 'Password',
-    passwordPlaceholder: '••••••••',
-    passwordMinFormat: 'Min. 6 characters',
+    passwordPlaceholder: 'Enter your password',
+    passwordMinFormat: 'At least 6 characters',
     loading: 'Loading...',
-
-    // Login
-    loginTitle: 'Sign in to your account',
-    loginGreeting: 'Welcome back 👋',
+    loginTitle: 'Sign in to your workspace',
+    loginGreeting: 'Welcome back',
     loginButton: 'Sign In',
     loginTab: 'Login',
     signInAction: 'Sign in',
     noAccount: "Don't have an account?",
     createOne: 'Create one',
     forgotPasswordLink: 'Forgot password?',
-
-    // Register
-    registerTitle: 'Create your free account',
-    registerGreeting: 'Create your account ✨',
+    registerTitle: 'Create your studio account',
+    registerGreeting: 'Launch your first campaign',
     registerButton: 'Create Account',
     registerTab: 'Register',
     createAccountAction: 'Create account',
-    confirmPasswordLabel: 'Confirm Password',
+    confirmPasswordLabel: 'Confirm password',
     hasAccount: 'Already have an account?',
     signInInstead: 'Sign in instead',
-
-    // Forgot Password
     forgotTitle: 'Reset your password',
-    forgotSubtitle: 'Enter your email and we will send you a reset link.',
-    forgotButton: 'Send Reset Link',
+    forgotSubtitle: 'Enter your email and we will send you a secure reset link.',
+    forgotButton: 'Send reset link',
     backToLogin: 'Back to sign in',
-
-    // Reset Password
-    resetTitle: 'Set new password',
-    resetSubtitle: 'Please enter your new password below.',
-    resetButton: 'Update Password',
-    newPasswordLabel: 'New Password',
-    
-    // Dashboard
-    welcomeBack: 'Welcome back!',
+    resetTitle: 'Choose a new password',
+    resetSubtitle: 'Create a fresh password to get back into your studio.',
+    resetButton: 'Update password',
+    newPasswordLabel: 'New password',
+    welcomeBack: 'Welcome back',
     campaigns: 'Campaigns',
     assets: 'Assets',
     generations: 'Generations',
-    signOut: 'Sign Out',
-    dashboardHint: '🚀 Your AI Marketing workspace is ready. Start creating!',
+    signOut: 'Sign out',
+    dashboardHint: 'Your studio is ready for the next launch.',
     aiAssistant: 'AI Assistant',
-    chatDescription: 'Chat with our AI to generate ideas and content.',
-    startChat: 'Start Chat',
-
-    // Chat
+    chatDescription: 'Generate ideas and supporting copy with AI.',
+    startChat: 'Start chat',
     chatTitle: 'AI Assistant',
-    chatPlaceholder: 'Message AI Assistant…',
+    chatPlaceholder: 'Message the assistant...',
     send: 'Send',
     clearChat: 'Clear',
     aiThinking: 'AI is thinking...',
-    newChat: 'New Chat',
+    newChat: 'New chat',
     noHistory: 'No conversations yet',
-    chatWelcome: 'How can I help you today?',
-    chatWelcomeSub: 'Start a conversation with your AI Marketing Assistant',
-    chatDisclaimer: 'AI can make mistakes. Check important info.',
-
-    // Errors
-    errorRequired: 'Please fill in all fields.',
+    chatWelcome: 'How can I help today?',
+    chatWelcomeSub: 'Start a conversation with your AI marketing assistant.',
+    chatDisclaimer: 'AI can make mistakes. Review important information.',
+    errorRequired: 'Please fill in all required fields.',
     errorEmail: 'Please enter a valid email address.',
     errorPassLength: 'Password must be at least 6 characters.',
     errorPassMatch: 'Passwords do not match.',
     errorChat: 'Something went wrong. Please try again.',
   },
   sq: {
-    // Auth Shared
-    appName: 'Marketing AI',
+    appName: 'AI Marketing Studio',
     emailLabel: 'Adresa e email-it',
     emailPlaceholder: 'ju@shembull.com',
-    passwordLabel: 'Fjalëkalimi',
-    passwordPlaceholder: '••••••••',
-    passwordMinFormat: 'Min. 6 karaktere',
+    passwordLabel: 'Fjalekalimi',
+    passwordPlaceholder: 'Shkruani fjalekalimin',
+    passwordMinFormat: 'Te pakten 6 karaktere',
     loading: 'Duke ngarkuar...',
-
-    // Login
-    loginTitle: 'Hyni në llogarinë tuaj',
-    loginGreeting: 'Mirë se u kthyet 👋',
+    loginTitle: 'Hyni ne studion tuaj',
+    loginGreeting: 'Mire se u kthyete',
     loginButton: 'Hyr',
     loginTab: 'Hyr',
-    signInAction: 'Kyçu',
+    signInAction: 'Hyr',
     noAccount: 'Nuk keni llogari?',
-    createOne: 'Krijo një',
-    forgotPasswordLink: 'Keni harruar fjalëkalimin?',
-
-    // Register
-    registerTitle: 'Krijoni llogarinë tuaj falas',
-    registerGreeting: 'Krijo llogarinë tënde ✨',
-    registerButton: 'Krijo Llogari',
+    createOne: 'Krijoni nje',
+    forgotPasswordLink: 'Keni harruar fjalekalimin?',
+    registerTitle: 'Krijoni llogarine e studios',
+    registerGreeting: 'Nisni fushaten tuaj te pare',
+    registerButton: 'Krijo llogari',
     registerTab: 'Regjistrohu',
-    createAccountAction: 'Krijo Llogari',
-    confirmPasswordLabel: 'Konfirmo Fjalëkalimin',
-    hasAccount: 'Keni tashmë një llogari?',
-    signInInstead: 'Kyçu në vend',
-
-    // Forgot Password
-    forgotTitle: 'Rivendos fjalëkalimin',
-    forgotSubtitle: 'Shënoni email-in dhe do t\'ju dërgojmë një link rivendosjeje.',
-    forgotButton: 'Dërgo Linkun',
+    createAccountAction: 'Krijo llogari',
+    confirmPasswordLabel: 'Konfirmo fjalekalimin',
+    hasAccount: 'Keni tashme nje llogari?',
+    signInInstead: 'Hyni ne vend te kesaj',
+    forgotTitle: 'Rivendosni fjalekalimin',
+    forgotSubtitle: 'Vendosni email-in dhe do t\'ju dergojme nje link te sigurt.',
+    forgotButton: 'Dergo linkun',
     backToLogin: 'Kthehu te hyrja',
-
-    // Reset Password
-    resetTitle: 'Vendosni fjalëkalimin e ri',
-    resetSubtitle: 'Ju lutemi shënoni fjalëkalimin e ri më poshtë.',
-    resetButton: 'Përditëso Fjalëkalimin',
-    newPasswordLabel: 'Fjalëkalimi i Ri',
-
-    // Dashboard
-    welcomeBack: 'Mirësevini përsëri!',
-    campaigns: 'Kompani',
+    resetTitle: 'Vendosni nje fjalekalim te ri',
+    resetSubtitle: 'Krijoni nje fjalekalim te ri per t\'u kthyer ne studio.',
+    resetButton: 'Perditeso fjalekalimin',
+    newPasswordLabel: 'Fjalekalimi i ri',
+    welcomeBack: 'Mire se u kthyete',
+    campaigns: 'Fushata',
     assets: 'Asete',
     generations: 'Gjenerime',
     signOut: 'Dil',
-    dashboardHint: '🚀 Hapësira juaj e Marketing AI është gati. Fillo të krijosh!',
+    dashboardHint: 'Studioja juaj eshte gati per fushaten e radhes.',
     aiAssistant: 'Asistenti AI',
-    chatDescription: 'Bisedoni me AI tonë për të gjeneruar ide dhe përmbajtje.',
-    startChat: 'Fillo Bisedën',
-
-    // Chat
+    chatDescription: 'Gjeneroni ide dhe tekst mbeshtetes me AI.',
+    startChat: 'Fillo biseden',
     chatTitle: 'Asistenti AI',
-    chatPlaceholder: 'Shkruaj një mesazh…',
-    send: 'Dërgo',
+    chatPlaceholder: 'Shkruani nje mesazh...',
+    send: 'Dergo',
     clearChat: 'Pastro',
     aiThinking: 'AI po mendon...',
-    newChat: 'Bisedë e Re',
-    noHistory: 'Asnjë bisedë ende',
+    newChat: 'Bisede e re',
+    noHistory: 'Nuk ka biseda ende',
     chatWelcome: 'Si mund t\'ju ndihmoj sot?',
-    chatWelcomeSub: 'Filloni një bisedë me Asistentin tuaj AI të Marketingut',
-    chatDisclaimer: 'AI mund të bëjë gabime. Kontrolloni informacionet e rëndësishme.',
-
-    // Errors
-    errorRequired: 'Ju lutemi plotësoni të gjitha fushat.',
-    errorEmail: 'Ju lutemi jepni një email të vlefshëm.',
-    errorPassLength: 'Fjalëkalimi duhet të jetë të paktën 6 karaktere.',
-    errorPassMatch: 'Fjalëkalimet nuk përputhen.',
-    errorChat: 'Diçka shkoi keq. Ju lutemi provoni sërish.',
-  }
+    chatWelcomeSub: 'Filloni nje bisede me asistentin tuaj te marketingut.',
+    chatDisclaimer: 'AI mund te beje gabime. Verifikoni informacionin e rendesishem.',
+    errorRequired: 'Ju lutemi plotesoni te gjitha fushat e kerkuara.',
+    errorEmail: 'Ju lutemi vendosni nje email te vlefshem.',
+    errorPassLength: 'Fjalekalimi duhet te kete te pakten 6 karaktere.',
+    errorPassMatch: 'Fjalekalimet nuk perputhen.',
+    errorChat: 'Dicka shkoi keq. Ju lutemi provoni perseri.',
+  },
 };
 
 const LanguageContext = createContext(null);
@@ -161,13 +130,7 @@ export const LanguageProvider = ({ children }) => {
     setLang((prev) => (prev === 'en' ? 'sq' : 'en'));
   };
 
-  /**
-   * Translation function
-   * @param {string} key - the translation key
-   */
-  const t = (key) => {
-    return translations[lang][key] || key;
-  };
+  const t = (key) => translations[lang][key] || key;
 
   return (
     <LanguageContext.Provider value={{ lang, toggleLanguage, t }}>
