@@ -38,6 +38,7 @@ router.get('/jobs', async (_req, res, next) => {
 
 router.post('/photo-jobs', upload.array('images', 2), async (req, res, next) => {
   try {
+    const title = String(req.body.title || '').trim();
     const description = String(req.body.description || '').trim();
     const style = String(req.body.style || '').trim();
     const productCategory = String(req.body.productCategory || 'general-product').trim();
@@ -65,6 +66,7 @@ router.post('/photo-jobs', upload.array('images', 2), async (req, res, next) => 
     }
 
     const job = await PhotoJob.create({
+      title,
       description,
       productCategory,
       style,
@@ -101,6 +103,7 @@ router.post('/photo-jobs', upload.array('images', 2), async (req, res, next) => 
 
 router.post('/jobs', upload.array('images', 2), async (req, res, next) => {
   try {
+    const title = String(req.body.title || '').trim();
     const description = String(req.body.description || '').trim();
     const style = String(req.body.style || '').trim();
     const productCategory = String(req.body.productCategory || 'general-product').trim();
@@ -131,6 +134,7 @@ router.post('/jobs', upload.array('images', 2), async (req, res, next) => {
     }
 
     const job = await VideoJob.create({
+      title,
       description,
       productCategory,
       style,

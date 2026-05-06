@@ -581,6 +581,19 @@ function DashboardPage() {
                     </div>
 
                     <label className="field">
+                      <span className="field__label">Campaign Name</span>
+                      <input
+                        type="text"
+                        className="field__control"
+                        placeholder="e.g. Summer Launch 2024"
+                        value={form.title}
+                        onChange={(event) =>
+                          setForm((current) => ({ ...current, title: event.target.value }))
+                        }
+                      />
+                    </label>
+
+                    <label className="field">
                       <span className="field__label">Brief</span>
                       <textarea
                         className="field__control field__control--textarea"
@@ -734,7 +747,7 @@ function DashboardPage() {
                     <div className="player__topline">
                       <div className="player__label">
                         <Sparkles size={14} strokeWidth={2.4} />
-                        <span>{activeJob?.kind === 'photo' ? 'PHOTO LANE' : 'VIDEO REEL'}</span>
+                        <span>{activeJob?.title || (activeJob?.kind === 'photo' ? 'PHOTO LANE' : 'VIDEO REEL')}</span>
                       </div>
                       <div className="player__badge">
                         {activeJob ? formatDate(activeJob.createdAt) : 'NO JOB'}
@@ -933,7 +946,7 @@ function DashboardPage() {
                         onClick={() => handleHistoryCardClick(job)}
                       >
                         <div className="history-card__top">
-                          <span className="history-card__title">{job.description || 'Untitled job'}</span>
+                          <span className="history-card__title">{job.title || job.description || 'Untitled job'}</span>
                           <span className="history-card__date">{formatDate(job.createdAt)}</span>
                         </div>
                         <div className="history-card__meta">

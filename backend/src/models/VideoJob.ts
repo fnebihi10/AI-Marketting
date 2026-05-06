@@ -81,6 +81,7 @@ const videoJobSchema = new Schema(
     progress: { type: Number, default: 0 },
     message: { type: String, default: 'Queued for generation.' },
     error: { type: String, default: '' },
+    title: { type: String, default: '' },
     description: { type: String, required: true },
     productCategory: { type: String, default: 'general-product' },
     style: { type: String, required: true },

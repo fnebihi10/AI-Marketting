@@ -23,6 +23,7 @@ export interface VideoJob {
   progress: number;
   message: string;
   error?: string;
+  title?: string;
   description: string;
   productCategory?: string;
   style: string;
@@ -59,6 +60,7 @@ export interface PhotoJob {
   progress: number;
   message: string;
   error?: string;
+  title?: string;
   description: string;
   productCategory?: string;
   style: string;
@@ -157,6 +159,7 @@ export const resetPassword = async (token: string, password: string) => {
 
 export const createJob = async (payload: {
   images?: File[] | null;
+  title: string;
   description: string;
   productCategory: string;
   style: string;
@@ -167,6 +170,7 @@ export const createJob = async (payload: {
       formData.append('images', file);
     });
   }
+  formData.append('title', payload.title);
   formData.append('description', payload.description);
   formData.append('productCategory', payload.productCategory);
   formData.append('style', payload.style);
@@ -188,6 +192,7 @@ export const createJob = async (payload: {
 
 export const createPhotoJob = async (payload: {
   images?: File[] | null;
+  title: string;
   description: string;
   productCategory: string;
   style: string;
@@ -198,6 +203,7 @@ export const createPhotoJob = async (payload: {
       formData.append('images', file);
     });
   }
+  formData.append('title', payload.title);
   formData.append('description', payload.description);
   formData.append('productCategory', payload.productCategory);
   formData.append('style', payload.style);

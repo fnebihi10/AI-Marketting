@@ -3,6 +3,7 @@ import { createJob, createPhotoJob } from '../lib/api';
 import { CampaignKind } from './useJobs';
 
 export type FormState = {
+  title: string;
   description: string;
   style: string;
   productCategory: string;
@@ -15,6 +16,7 @@ export const useCampaignForm = (
   onLoadJobs: () => Promise<void>
 ) => {
   const [form, setForm] = useState<FormState>({
+    title: 'New Campaign',
     description: 'Launch teaser for the next campaign',
     style: 'energetic',
     productCategory: 'food-dessert',
@@ -37,15 +39,17 @@ export const useCampaignForm = (
     setIsSubmitting(true);
 
     try {
+      const title = form.title.trim();
       const description = form.description.trim();
       const style = form.style.trim();
       const productCategory = form.productCategory.trim();
 
-      if (!description || !style || !productCategory) {
-        throw new Error('Please complete the brief, style, and category.');
+      if (!title || !description || !style || !productCategory) {
+        throw new Error('Please complete the title, brief, style, and category.');
       }
 
       const payload = {
+        title,
         description,
         style,
         productCategory,
