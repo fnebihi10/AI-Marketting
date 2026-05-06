@@ -43,8 +43,27 @@ const createModes: Array<{
   { kind: 'photo', label: 'Photo' },
 ];
 
-const createStyles = ['Energetic', 'Minimal', 'Premium', 'Bold', 'Clean'];
-const productCategories = ['Food', 'Studio', 'Product', 'Fashion', 'Tech'];
+const createStyles = [
+  { value: 'energetic', label: 'Energetic', tone: 'Fast hook, bold cadence, punchy CTA' },
+  { value: 'luxury', label: 'Luxury', tone: 'Premium tone, refined pacing, elegant product framing' },
+  { value: 'minimal', label: 'Minimal', tone: 'Clean visuals, crisp copy, understated confidence' },
+  { value: 'cinematic', label: 'Cinematic', tone: 'Atmospheric, emotive, brand-film energy' },
+];
+
+const productCategories = [
+  { value: 'beauty-skincare', label: 'Beauty & Skincare' },
+  { value: 'beverages-energy-drinks', label: 'Beverages & Energy Drinks' },
+  { value: 'perfume-fragrance', label: 'Perfume & Fragrance' },
+  { value: 'food-dessert', label: 'Food & Dessert' },
+  { value: 'fashion-accessories', label: 'Fashion & Accessories' },
+  { value: 'fitness-wellness', label: 'Fitness & Wellness' },
+  { value: 'gaming-esports', label: 'Gaming & Esports' },
+  { value: 'sports-football', label: 'Sports / Football' },
+  { value: 'tech-gadgets', label: 'Tech & Gadgets' },
+  { value: 'home-lifestyle', label: 'Home & Lifestyle' },
+  { value: 'jewelry-luxury', label: 'Jewelry & Luxury' },
+  { value: 'pet-products', label: 'Pet Products' },
+];
 
 const sidebarItems: Array<{
   label: string;
@@ -216,8 +235,8 @@ function DashboardPage() {
 
   const focusItems = [
     { label: 'Mode', value: createMode === 'video' ? 'Video' : 'Photo' },
-    { label: 'Style', value: form.style },
-    { label: 'Category', value: form.productCategory },
+    { label: 'Style', value: createStyles.find(s => s.value === form.style)?.label || form.style },
+    { label: 'Category', value: productCategories.find(c => c.value === form.productCategory)?.label || form.productCategory },
     { label: 'Images', value: form.images.length > 0 ? `${form.images.length} selected` : 'None' },
     { label: 'Queue', value: isSubmitting ? 'Sending' : 'Ready' },
   ];
@@ -583,9 +602,9 @@ function DashboardPage() {
                             setForm((current) => ({ ...current, style: event.target.value }))
                           }
                         >
-                          {createStyles.map((style) => (
-                            <option key={style} value={style}>
-                              {style}
+                          {createStyles.map((item) => (
+                            <option key={item.value} value={item.value}>
+                              {item.label}
                             </option>
                           ))}
                         </select>
@@ -600,9 +619,9 @@ function DashboardPage() {
                             setForm((current) => ({ ...current, productCategory: event.target.value }))
                           }
                         >
-                          {productCategories.map((category) => (
-                            <option key={category} value={category}>
-                              {category}
+                          {productCategories.map((item) => (
+                            <option key={item.value} value={item.value}>
+                              {item.label}
                             </option>
                           ))}
                         </select>
@@ -995,8 +1014,8 @@ export default function App() {
         }
       />
       <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      <Route path="/" element={<Navigate to="/login" replace />} />
+      <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );
 }

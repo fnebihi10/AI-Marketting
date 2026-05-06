@@ -9,7 +9,7 @@ import BrandLogo from '../components/common/BrandLogo';
 
 const LoginPage = () => {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, isExpired, setIsExpired } = useAuth();
   const { lang, toggleLanguage, t } = useLanguage();
   const { theme, toggleTheme } = useTheme();
 
@@ -17,12 +17,15 @@ const LoginPage = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleChange = (e) =>
+  const handleChange = (e) => {
+    if (isExpired) setIsExpired(false);
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    if (isExpired) setIsExpired(false);
 
     const { email, password } = formData;
     if (!email || !password) {
@@ -70,6 +73,12 @@ const LoginPage = () => {
           <h1 className="auth-title">{t('appName')}</h1>
           <p className="auth-subtitle">{t('loginTitle')}</p>
         </div>
+
+        {isExpired && (
+          <div className="form-error" style={{ marginBottom: '1.5rem', backgroundColor: 'rgba(255, 152, 0, 0.1)', color: '#ff9800', borderColor: '#ff9800' }}>
+            {t('sessionExpired')}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} noValidate>
           <div className="form-group">

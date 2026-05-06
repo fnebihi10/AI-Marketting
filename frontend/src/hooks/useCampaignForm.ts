@@ -16,8 +16,8 @@ export const useCampaignForm = (
 ) => {
   const [form, setForm] = useState<FormState>({
     description: 'Launch teaser for the next campaign',
-    style: 'Energetic',
-    productCategory: 'Food',
+    style: 'energetic',
+    productCategory: 'food-dessert',
     images: [],
   });
   const [isSubmitting, setIsSubmitting] = useState(false);

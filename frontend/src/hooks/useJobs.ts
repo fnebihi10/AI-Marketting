@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { fetchJobs, type VideoJob, type PhotoJob } from '../lib/api';
 import { useJobEvents } from './useJobEvents';
 import { handlePuterImageGeneration } from '../lib/puterService';
+import { useAuth } from '../context/AuthContext';
 
 export type CampaignKind = 'video' | 'photo';
 export type DashboardJob = (VideoJob | PhotoJob) & { kind: CampaignKind };
@@ -17,6 +18,7 @@ const toDashboardJob = (job: VideoJob | PhotoJob, kind: CampaignKind): Dashboard
 });
 
 export const useJobs = (activeJobId: string | null) => {
+  const { logout, setIsExpired } = useAuth();
   const [jobs, setJobs] = useState<JobsState>({ videoJobs: [], photoJobs: [] });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -30,11 +32,17 @@ export const useJobs = (activeJobId: string | null) => {
       setJobs(payload);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load dashboard data.';
-      setError(message === 'UNAUTHORIZED' ? 'Connect a valid session to load dashboard data.' : message);
+      if (message === 'UNAUTHORIZED') {
+        setIsExpired?.(true);
+        logout?.();
+        setError('Connect a valid session to load dashboard data.');
+      } else {
+        setError(message);
+      }
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [logout, setIsExpired]);
 
   useEffect(() => {
     void loadJobs();

@@ -57,6 +57,7 @@ const translations = {
     errorPassLength: 'Password must be at least 6 characters.',
     errorPassMatch: 'Passwords do not match.',
     errorChat: 'Something went wrong. Please try again.',
+    sessionExpired: 'Your session has expired. Please log in again.',
   },
   sq: {
     appName: 'AI Marketing Studio',
@@ -114,6 +115,7 @@ const translations = {
     errorPassLength: 'Fjalekalimi duhet te kete te pakten 6 karaktere.',
     errorPassMatch: 'Fjalekalimet nuk perputhen.',
     errorChat: 'Dicka shkoi keq. Ju lutemi provoni perseri.',
+    sessionExpired: 'Sesioni juaj ka skaduar. Ju lutemi hyni perseri.',
   },
 };
 
