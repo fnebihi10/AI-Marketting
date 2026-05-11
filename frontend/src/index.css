@@ -82,12 +82,21 @@
   margin: 0 0 10px;
   font-size: 0.92rem;
   line-height: 1.6;
-  color: #1e293b !important;
   font-style: italic;
+  font-weight: 600;
+  background: linear-gradient(135deg, #7c3aed, #6366f1 40%, #a855f7 70%, #ec4899);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  filter: drop-shadow(0 0 8px rgba(139, 92, 246, 0.25));
 }
 
 .is-dark .photo-caption-text {
-  color: #e2e8f0 !important;
+  background: linear-gradient(135deg, #a78bfa, #818cf8 40%, #c084fc 70%, #f472b6);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  filter: drop-shadow(0 0 10px rgba(167, 139, 250, 0.35));
 }
 
 .photo-caption-tags {
@@ -211,8 +220,6 @@
   background: rgba(99, 102, 241, 0.1);
   border-color: rgba(99, 102, 241, 0.22);
 }
-
-.is-dark .photo-caption-text { color: #e0e7ff; }
 
 .is-dark .photo-concept-card {
   background: rgba(255,255,255,0.04);
@@ -727,6 +734,118 @@ video {
 .panel--workspace,
 .panel--brief {
   padding: 22px 28px;
+}
+
+/* ─── Campaign Brief Inner Elements ─── */
+.brief-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.brief-count {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  background: var(--surface-alt);
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-soft);
+}
+
+.brief-editor {
+  margin-bottom: 18px;
+  padding: 16px 18px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.06), rgba(139, 92, 246, 0.03));
+  border: 1px solid rgba(99, 102, 241, 0.14);
+}
+
+.brief-editor__content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.brief-editor__line {
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--text-soft);
+}
+
+.brief-editor__line--main {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-main);
+  line-height: 1.5;
+}
+
+.brief-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.brief-chip {
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  background: rgba(99, 102, 241, 0.08);
+  color: #6366f1;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  outline: none;
+}
+
+.brief-chip:hover {
+  background: rgba(99, 102, 241, 0.15);
+  border-color: rgba(99, 102, 241, 0.4);
+  transform: translateY(-1px);
+}
+
+.brief-chip.is-active {
+  background: #6366f1;
+  color: #fff;
+  border-color: #6366f1;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+/* Dark mode overrides for Brief */
+.is-dark .brief-chip:hover {
+  background: rgba(99, 102, 241, 0.25);
+}
+
+.is-dark .brief-chip.is-active {
+  background: #818cf8;
+  border-color: #818cf8;
+  color: #fff;
+}
+
+.is-dark .brief-editor__line--main {
+  color: #e0e7ff;
+}
+
+.is-dark .brief-editor__line {
+  color: #94a3b8;
+}
+
+.is-dark .brief-chip {
+  background: rgba(99, 102, 241, 0.15);
+  border-color: rgba(99, 102, 241, 0.35);
+  color: #a5b4fc;
+}
+
+.is-dark .brief-count {
+  background: rgba(255,255,255,0.06);
+  border-color: rgba(255,255,255,0.1);
+  color: #94a3b8;
 }
 
 .panel--create {

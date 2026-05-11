@@ -29,6 +29,9 @@ export interface VideoJob {
   style: string;
   imageUrl?: string;
   imageUrls?: string[];
+  audience?: string;
+  offer?: string;
+  proof?: string;
   createdAt: string;
   script?: {
     title?: string;
@@ -69,6 +72,9 @@ export interface PhotoJob {
   imageUrl?: string;
   imageUrls?: string[];
   caption?: string;
+  audience?: string;
+  offer?: string;
+  proof?: string;
   createdAt: string;
   output?: {
     variants?: Array<{ url: string; localPath?: string }>;

@@ -28,6 +28,9 @@ const photoJobSchema = new Schema(
     imageUrls: { type: [String], default: [] },
     prompt: { type: String, default: '' },
     caption: { type: String, default: '' },
+    audience: { type: String, default: '' },
+    offer: { type: String, default: '' },
+    proof: { type: String, default: '' },
     output: {
       variants: [storageAssetSchema],
       final: storageAssetSchema,

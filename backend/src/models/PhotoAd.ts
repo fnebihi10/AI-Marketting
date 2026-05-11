@@ -26,7 +26,10 @@ const photoAdSchema = new Schema(
     images: {
       type: [storageAssetSchema],
       default: []
-    }
+    },
+    audience: { type: String, default: '' },
+    offer: { type: String, default: '' },
+    proof: { type: String, default: '' }
   },
   { timestamps: true }
 );

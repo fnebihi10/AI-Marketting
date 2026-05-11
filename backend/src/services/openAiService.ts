@@ -43,9 +43,7 @@ const isEsportsBrief = (description: string, productCategory: string) => {
 const scriptSchema = {
   name: 'marketing_video_script',
   schema: {
-    type: 'object',
-    additionalProperties: false,
-    required: ['title', 'hook', 'cta', 'hashtags', 'musicMood', 'scenes'],
+    required: ['title', 'hook', 'cta', 'hashtags', 'musicMood', 'audience', 'offer', 'proof', 'scenes'],
     properties: {
       title: { type: 'string' },
       hook: { type: 'string' },
@@ -57,6 +55,9 @@ const scriptSchema = {
         maxItems: 8,
       },
       musicMood: { type: 'string' },
+      audience: { type: 'string' },
+      offer: { type: 'string' },
+      proof: { type: 'string' },
       scenes: {
         type: 'array',
         minItems: 4,
@@ -175,8 +176,11 @@ const normalizeScriptPackage = (payload: ScriptPackage) => {
       )
     ).slice(0, 8),
     musicMood: normalizeLine(payload.musicMood),
+    audience: normalizeLine((payload as any).audience || ''),
+    offer: normalizeLine((payload as any).offer || ''),
+    proof: normalizeLine((payload as any).proof || ''),
     scenes
-  } satisfies ScriptPackage;
+  } satisfies ScriptPackage & { audience: string; offer: string; proof: string };
 };
 
 export const generateScriptPackage = async (
@@ -277,7 +281,10 @@ export const generateScriptPackage = async (
             'Treat wrong-product visuals as a failure. If the product is baklava, do not suggest cake, frosting, whipped cream, cupcakes, or unrelated dessert prep.',
             'For food products, prioritize closeups, serving, slicing, plating, ingredients, and authentic product textures before secondary lifestyle context.',
             'For fitness products, favor workout, home training, stretching, sweating, coaching, progress checks, and strong post-workout confidence over talking or standing around.',
-            'imagePrompt must stay truthful to the product category and should never invent irrelevant content.'
+            'imagePrompt must stay truthful to the product category and should never invent irrelevant content.',
+            'Include an "audience" field describing the primary buyer persona.',
+            'Include an "offer" field describing the core deal or promise.',
+            'Include a "proof" field describing why the customer should trust the product.'
           ].join('\n')
         }
       ]
@@ -346,4 +353,73 @@ export const generateScriptPackage = async (
   const parsed = normalizeScriptPackage(parseJson(content) as ScriptPackage);
   await setCache(cacheKey, parsed);
   return parsed;
+};
+
+export const generateMarketingBrief = async (
+  description: string,
+  style: string,
+  productCategory: string
+) => {
+  const cacheKey = `brief:${sha256(`${style}:${productCategory}:${description}`)}`;
+  const cached = await getCache<{ audience: string; offer: string; proof: string }>(cacheKey);
+  if (cached) return cached;
+
+  if (!config.openAiApiKey) {
+    return {
+      audience: `High-intent consumers interested in ${productCategory}`,
+      offer: `Premium ${description.slice(0, 20)}... with ${style} aesthetics`,
+      proof: `AI-optimized marketing asset for high conversion`
+    };
+  }
+
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${config.openAiApiKey}`
+    },
+    body: JSON.stringify({
+      model: config.openAiModel,
+      max_tokens: 400,
+      temperature: 0.7,
+      response_format: { type: 'json_object' },
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a senior marketing strategist. Extract the core marketing strategy from the provided brief.'
+        },
+        {
+          role: 'user',
+          content: [
+            `Description: ${description}`,
+            `Style: ${style}`,
+            `Category: ${productCategory}`,
+            'Return a JSON object with exactly these keys: "audience", "offer", "proof".',
+            'Keep each description concise and punchy (10-15 words max).'
+          ].join('\n')
+        }
+      ]
+    })
+  });
+
+  if (!response.ok) {
+    return {
+      audience: `Consumers interested in ${productCategory}`,
+      offer: `Exclusive ${style} campaign for this product`,
+      proof: `Professional quality visual storytelling`
+    };
+  }
+
+  const payload = await response.json();
+  const content = payload.choices?.[0]?.message?.content;
+  const parsed = parseJson(content);
+  
+  const result = {
+    audience: normalizeLine(parsed.audience || ''),
+    offer: normalizeLine(parsed.offer || ''),
+    proof: normalizeLine(parsed.proof || '')
+  };
+
+  await setCache(cacheKey, result);
+  return result;
 };

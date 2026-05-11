@@ -89,6 +89,9 @@ const videoJobSchema = new Schema(
     imageUrl: { type: String, default: '' },
     imagePaths: { type: [String], default: [] },
     imageUrls: { type: [String], default: [] },
+    audience: { type: String, default: '' },
+    offer: { type: String, default: '' },
+    proof: { type: String, default: '' },
     script: {
       title: String,
       hook: String,

@@ -172,6 +172,7 @@ function DashboardPage() {
   const [photoProgressLabel, setPhotoProgressLabel] = useState('');
   const [error, setError] = useState('');
   const [selectedPhotoImageIdx, setSelectedPhotoImageIdx] = useState<number | null>(null);
+  const [briefTab, setBriefTab] = useState<'audience' | 'offer' | 'proof'>('audience');
 
   const {
     jobs,
@@ -188,9 +189,22 @@ function DashboardPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const activeJob = useMemo(() => {
-    if (!combinedJobs.length) return null;
-    return combinedJobs.find((job) => job._id === selectedJobId) || combinedJobs[0];
-  }, [combinedJobs, selectedJobId]);
+    // Try to find in combinedJobs first (Video/Photo Jobs)
+    const job = combinedJobs.find((j) => j._id === selectedJobId);
+    if (job) return job;
+
+    // Then try to find in photoAds
+    const ad = photoAds.find((a) => a._id === selectedJobId || a._id === selectedPhotoAdId);
+    if (ad) {
+      return {
+        ...ad,
+        kind: 'photo',
+        description: ad.prompt || ad.description, // PhotoAds use 'prompt' for description
+      };
+    }
+
+    return combinedJobs[0] || null;
+  }, [combinedJobs, photoAds, selectedJobId, selectedPhotoAdId]);
 
   useEffect(() => {
     if (combinedJobs.length === 0) {
@@ -319,6 +333,7 @@ function DashboardPage() {
   };
 
   const handlePhotoCardClick = (ad: any) => {
+    setSelectedJobId(null);
     setCreatorMode('photo');
     setSelectedPhotoAdId(ad._id);
     setSelectedPhotoImageIdx(null);
@@ -372,6 +387,7 @@ function DashboardPage() {
       }
 
       setPhotoAds((current) => [nextSet, ...current]);
+      setSelectedJobId(null);
       setSelectedPhotoAdId(nextSet._id);
       setPhotoProgressLabel('Photo set saved and ready.');
       setPhotoTitle('');
@@ -399,6 +415,7 @@ function DashboardPage() {
   const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<'preview' | 'brief' | 'overview'>('overview');
 
   const handleHistoryCardClick = (job: DashboardJob) => {
+    setSelectedPhotoAdId(null);
     setSelectedJobId(job._id);
     setHistoryMode(job.kind);
     setWorkspaceFocus('preview');
@@ -1134,30 +1151,67 @@ function DashboardPage() {
                     </div>
                     <div className="brief-editor">
                       <div className="brief-editor__content">
-                        <div className="brief-editor__line brief-editor__line--main">
-                          {activeJob?.description || 'Audience, promise, proof'}
-                        </div>
-                        <div className="brief-editor__line">
-                          {activeJob
-                            ? activeJob.message || 'Pulled directly from backend jobs.'
-                            : 'Keep it short. One clear idea per line.'}
-                        </div>
+                        {briefTab === 'audience' && (
+                          <>
+                            <div className="brief-editor__line brief-editor__line--main" style={{ color: '#8b5cf6' }}>TARGET AUDIENCE</div>
+                            <div className="brief-editor__line">
+                              {activeJob?.audience 
+                                ? activeJob.audience 
+                                : activeJob 
+                                  ? `Primary target: High-intent consumers interested in ${activeJob.style || 'modern'} ${activeJob.productCategory || 'products'}.`
+                                  : 'Define who this campaign is for (e.g., "Luxury watch enthusiasts aged 25-45").'}
+                            </div>
+                          </>
+                        )}
+                        {briefTab === 'offer' && (
+                          <>
+                            <div className="brief-editor__line brief-editor__line--main" style={{ color: '#6366f1' }}>THE OFFER</div>
+                            <div className="brief-editor__line">
+                              {activeJob?.offer 
+                                ? activeJob.offer 
+                                : activeJob 
+                                  ? `The core promise: High-end ${activeJob.title || 'product'} visual storytelling with ${activeJob.style} aesthetics.`
+                                  : 'What are you selling? (e.g., "Limited edition ceramic timepiece with free shipping").'}
+                            </div>
+                          </>
+                        )}
+                        {briefTab === 'proof' && (
+                          <>
+                            <div className="brief-editor__line brief-editor__line--main" style={{ color: '#ec4899' }}>PROOF & VALUE</div>
+                            <div className="brief-editor__line">
+                              {activeJob?.proof 
+                                ? activeJob.proof 
+                                : activeJob 
+                                  ? `Value Proposition: Professional grade AI-rendered assets optimized for social conversion.`
+                                  : 'Why should they trust you? (e.g., "Swiss-made movement, scratch-resistant sapphire").'}
+                            </div>
+                          </>
+                        )}
                       </div>
                     </div>
 
                     <div className="brief-chips">
-                      {(activeJob
-                        ? [
-                            activeJob.kind.toUpperCase(),
-                            getStatusLabel(activeJob.status).toUpperCase(),
-                            activeJob.style || 'STYLE',
-                          ]
-                        : ['AUDIENCE', 'OFFER', 'PROOF']
-                      ).map((chip) => (
-                        <span key={chip} className="brief-chip">
-                          {chip}
-                        </span>
-                      ))}
+                      <button 
+                        type="button"
+                        className={`brief-chip ${briefTab === 'audience' ? 'is-active' : ''}`}
+                        onClick={() => setBriefTab('audience')}
+                      >
+                        AUDIENCE
+                      </button>
+                      <button 
+                        type="button"
+                        className={`brief-chip ${briefTab === 'offer' ? 'is-active' : ''}`}
+                        onClick={() => setBriefTab('offer')}
+                      >
+                        OFFER
+                      </button>
+                      <button 
+                        type="button"
+                        className={`brief-chip ${briefTab === 'proof' ? 'is-active' : ''}`}
+                        onClick={() => setBriefTab('proof')}
+                      >
+                        PROOF
+                      </button>
                     </div>
                   </article>
 

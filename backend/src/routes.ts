@@ -18,6 +18,7 @@ import { trimVideo } from './services/renderService';
 import { uploadAsset } from './services/storageService';
 import { processVideoJob } from './services/jobOrchestrator';
 import { processPhotoJob, completePhotoJobWithImage } from './services/photoOrchestrator';
+import { generateMarketingBrief } from './services/openAiService';
 import { localJobEvents } from './services/localEventBus';
 import { protect } from './middleware/authMiddleware';
 import User from './models/User';
@@ -139,6 +140,14 @@ router.post('/photo-ads', protect, async (req: any, res, next) => {
       source: source || 'puter',
       images: []
     });
+
+    // Generate marketing brief in parallel
+    const brief = await generateMarketingBrief(prompt, style, productCategory).catch(() => null);
+    if (brief) {
+      photoAd.audience = brief.audience;
+      photoAd.offer = brief.offer;
+      photoAd.proof = brief.proof;
+    }
 
     const tempDir = path.join(config.workingDir, 'photo-ads', String(photoAd._id));
     await ensureDir(tempDir);

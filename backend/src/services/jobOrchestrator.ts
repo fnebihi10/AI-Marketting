@@ -565,6 +565,9 @@ export const processVideoJob = async (jobId: string) => {
     videoJob.productCategory || 'general-product'
   );
   videoJob.script = script;
+  videoJob.audience = script.audience;
+  videoJob.offer = script.offer;
+  videoJob.proof = script.proof;
   videoJob.metadata = {
     ...(videoJob.metadata || {}),
     jobFolder: jobDir,

@@ -24,7 +24,10 @@ const generatePhotoArtDirection = async (
   Requirements:
   - imagePrompt: 8k commercial photography, premium lighting, cinematic composition. NO TEXT. Keep it under 200 characters.
   - caption: A persuasive social media post (hook + CTA) including 4-6 relevant hashtags.
-  Return ONLY a JSON object with keys: "imagePrompt" and "caption".`;
+  - audience: Primary buyer persona (concise, 10-15 words).
+  - offer: The core deal or promise (concise, 10-15 words).
+  - proof: Why trust this product (concise, 10-15 words).
+  Return ONLY a JSON object with keys: "imagePrompt", "caption", "audience", "offer", "proof".`;
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -49,8 +52,11 @@ const generatePhotoArtDirection = async (
   const data = await response.json();
   const content = JSON.parse(data.choices[0].message.content);
   return {
-    imagePrompt: content.imagePrompt as string,
-    caption: content.caption as string,
+    imagePrompt: (content.imagePrompt as string) || '',
+    caption: (content.caption as string) || '',
+    audience: (content.audience as string) || '',
+    offer: (content.offer as string) || '',
+    proof: (content.proof as string) || '',
   };
 };
 
@@ -95,6 +101,9 @@ export const processPhotoJob = async (jobId: string) => {
 
     job.prompt = artDirection.imagePrompt;
     job.caption = artDirection.caption;
+    job.audience = artDirection.audience;
+    job.offer = artDirection.offer;
+    job.proof = artDirection.proof;
     await job.save();
 
     // Emit "pending-image-generation" — frontend will call Puter.js

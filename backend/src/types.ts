@@ -33,6 +33,9 @@ export interface ScriptPackage {
   cta: string;
   hashtags: string[];
   musicMood: string;
+  audience: string;
+  offer: string;
+  proof: string;
   scenes: ScriptScene[];
 }
 
