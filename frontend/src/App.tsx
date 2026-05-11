@@ -30,6 +30,8 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import { useJobs, useCampaignForm, type CampaignKind, type DashboardJob } from './hooks';
+import { generatePhotoAdSet } from './lib/puter';
+import { createPhotoAd, fetchPhotoAds } from './lib/api';
 
 type SectionKey = 'dashboard' | 'create' | 'workspace' | 'history';
 type CreateFocus = CampaignKind | 'upload';
@@ -133,8 +135,15 @@ const getInitials = (email?: string) => {
 
 function DashboardPage() {
   const { theme, toggleTheme } = useTheme();
-  const { logout, user, loading } = useAuth();
+  const { logout, user, loading, refreshUser } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!loading && user) {
+      refreshUser();
+      fetchPhotoAds().then(res => setPhotoAds(res)).catch(() => {});
+    }
+  }, []);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -154,6 +163,15 @@ function DashboardPage() {
   const [createFocus, setCreateFocus] = useState<CreateFocus>('video');
   const [workspaceFocus, setWorkspaceFocus] = useState<WorkspaceFocus>('preview');
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [photoAds, setPhotoAds] = useState<any[]>([]);
+  const [selectedPhotoAdId, setSelectedPhotoAdId] = useState<string | null>(null);
+  const [photoTitle, setPhotoTitle] = useState('');
+  const [photoPrompt, setPhotoPrompt] = useState('');
+  const [photoAspectRatio, setPhotoAspectRatio] = useState('1:1');
+  const [photoGenerating, setPhotoGenerating] = useState(false);
+  const [photoProgressLabel, setPhotoProgressLabel] = useState('');
+  const [error, setError] = useState('');
+  const [selectedPhotoImageIdx, setSelectedPhotoImageIdx] = useState<number | null>(null);
 
   const {
     jobs,
@@ -186,6 +204,12 @@ function DashboardPage() {
     }
   }, [combinedJobs, selectedJobId]);
 
+  useEffect(() => {
+    if (photoAds.length > 0 && !selectedPhotoAdId) {
+      setSelectedPhotoAdId(photoAds[0]._id);
+    }
+  }, [photoAds, selectedPhotoAdId]);
+
   const {
     form,
     setForm,
@@ -201,20 +225,26 @@ function DashboardPage() {
       setWorkspaceFocus('preview');
       setActiveSection('workspace');
       setExpandedSection('workspace');
+      refreshUser();
     },
     loadJobs
   );
 
   const videoCount = jobs.videoJobs.length;
-  const photoCount = jobs.photoJobs.length;
-  const totalCount = combinedJobs.length;
-  const readyCount = combinedJobs.filter((job) => job.status === 'completed').length;
+  const photoCount = jobs.photoJobs.length + photoAds.length;
+  const totalCount = combinedJobs.length + photoAds.length;
+  const readyCount = combinedJobs.filter((job) => job.status === 'completed').length + photoAds.length;
   const queuedCount = combinedJobs.filter(
     (job) => job.status === 'processing' || job.status === 'queued'
   ).length;
   const selectedHistory = combinedJobs.filter((job) => job.kind === historyMode).slice(0, 8);
   const activeProgress =
     activeJob?.progress ?? (activeJob?.status === 'completed' ? 100 : activeJob?.status ? 20 : 0);
+  const [puterStatus, setPuterStatus] = useState<string>('');
+  useEffect(() => {
+    (window as any).onPuterStatus = (msg: string) => setPuterStatus(msg);
+    return () => { (window as any).onPuterStatus = null; };
+  }, []);
   const userInitials = getInitials(user?.email);
   const userLabel = user?.email?.split('@')[0] || 'AI Studio';
 
@@ -254,15 +284,18 @@ function DashboardPage() {
   }, [activeJob]);
 
   const handleSidebarSelect = (section: SectionKey) => {
+    if (section === 'create') {
+      selectCreateMode('video');
+      return;
+    }
+    
     setActiveSection(section);
+    setExpandedSection(section);
 
     if (section === 'dashboard') {
       setExpandedSection(null);
       navigate('/dashboard', { replace: true });
-      return;
     }
-
-    setExpandedSection(section);
   };
 
   const selectCreateMode = (mode: CampaignKind) => {
@@ -284,6 +317,86 @@ function DashboardPage() {
     setActiveSection('history');
     setExpandedSection('history');
   };
+
+  const handlePhotoCardClick = (ad: any) => {
+    setCreatorMode('photo');
+    setSelectedPhotoAdId(ad._id);
+    setSelectedPhotoImageIdx(null);
+    setActiveWorkspaceTab('preview');
+    setActiveSection('workspace');
+    setExpandedSection('workspace');
+    setWorkspaceFocus('preview');
+  };
+
+  const handlePhotoGenerate = async () => {
+    if (!photoTitle.trim()) {
+      setError('Add a photo campaign name first.');
+      return;
+    }
+
+    if (!photoPrompt.trim()) {
+      setError('Describe the photo ad you want to generate.');
+      return;
+    }
+
+    try {
+      setPhotoGenerating(true);
+      setPhotoProgressLabel('Connecting to Puter...');
+      setError('');
+
+      const imageDataUrls = await generatePhotoAdSet(
+        {
+          title: photoTitle.trim(),
+          prompt: photoPrompt.trim(),
+          aspectRatio: photoAspectRatio,
+        },
+        setPhotoProgressLabel
+      );
+
+      setPhotoProgressLabel('Saving photo set to your studio...');
+
+      const result = await createPhotoAd({
+        title: photoTitle.trim(),
+        prompt: photoPrompt.trim(),
+        aspectRatio: photoAspectRatio,
+        productCategory: form.productCategory,
+        style: form.style,
+        source: 'puter',
+        imageDataUrls,
+      });
+
+      const nextSet = result.data;
+      if (typeof result.credits === 'number') {
+        localStorage.setItem('user_credits', String(result.credits));
+        refreshUser();
+      }
+
+      setPhotoAds((current) => [nextSet, ...current]);
+      setSelectedPhotoAdId(nextSet._id);
+      setPhotoProgressLabel('Photo set saved and ready.');
+      setPhotoTitle('');
+      setPhotoPrompt('');
+      
+      // Navigate to workspace
+      setActiveSection('workspace');
+      setExpandedSection('workspace');
+      setWorkspaceFocus('preview');
+      setCreatorMode('photo');
+    } catch (nextError: any) {
+      console.error('Photo ad generation failed:', nextError);
+      setError(nextError?.message || 'Photo generation failed.');
+      setPhotoProgressLabel('');
+    } finally {
+      setPhotoGenerating(false);
+    }
+  };
+
+  const selectedPhotoAd = useMemo(() => {
+    return photoAds.find((ad) => ad._id === selectedPhotoAdId) || null;
+  }, [photoAds, selectedPhotoAdId]);
+
+  const [creatorMode, setCreatorMode] = useState<'video' | 'photo'>('video');
+  const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<'preview' | 'brief' | 'overview'>('overview');
 
   const handleHistoryCardClick = (job: DashboardJob) => {
     setSelectedJobId(job._id);
@@ -332,7 +445,7 @@ function DashboardPage() {
       label: 'Workspace',
       title: 'Review every active output',
       detail: 'Open the selected asset, follow progress, and keep the campaign brief close.',
-      stat: activeJob ? getStatusLabel(activeJob.status) : 'No job',
+      stat: (creatorMode === 'photo' && selectedPhotoAd) ? 'Photo set active' : (activeJob ? getStatusLabel(activeJob.status) : 'No active asset'),
       actionLabel: 'Open workspace',
       onClick: () => handleSidebarSelect('workspace'),
       icon: Folder,
@@ -342,7 +455,7 @@ function DashboardPage() {
       label: 'History',
       title: 'Recent jobs grouped by type',
       detail: 'Browse recent video and photo work with status, dates, and backend notes.',
-      stat: isLoadingJobs ? '...' : `${selectedHistory.length} shown`,
+      stat: isLoadingJobs ? '...' : `${totalCount} items`,
       actionLabel: 'Open history',
       onClick: () => handleSidebarSelect('history'),
       icon: History,
@@ -465,8 +578,25 @@ function DashboardPage() {
               <span>{userInitials}</span>
             </div>
             <div className="sidebar-footer__identity">
-              <strong>{userLabel}</strong>
-              <small>Workspace owner</small>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+                <strong>{userLabel}</strong>
+                <span style={{ 
+                  fontSize: '10px', 
+                  color: '#f59e0b', 
+                  background: 'rgba(245, 158, 11, 0.15)', 
+                  padding: '2px 6px', 
+                  borderRadius: '4px',
+                  fontWeight: 700,
+                  border: '1px solid rgba(245, 158, 11, 0.3)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px'
+                }}>
+                  {user?.credits ?? 0} CREDITS
+                </span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <small>Workspace owner</small>
+              </div>
             </div>
             <button type="button" className="icon-pill" aria-label="Toggle theme" onClick={toggleTheme}>
               {theme === 'dark' ? <Sun size={16} strokeWidth={2.2} /> : <Moon size={16} strokeWidth={2.2} />}
@@ -574,36 +704,88 @@ function DashboardPage() {
                 <article className={`panel panel--create ${createFocus !== 'upload' ? 'is-emphasis' : ''}`}>
                   <div className="panel-kicker">{createCopy.tag}</div>
 
-                  <form className="campaign-form" onSubmit={handleCreateSubmit}>
+                  <form
+                    className="campaign-form"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      if (createMode === 'video') {
+                        handleCreateSubmit(event);
+                      } else {
+                        handlePhotoGenerate();
+                      }
+                    }}
+                  >
                     <div className="panel-copy">
-                      <h3>{createCopy.title}</h3>
-                      <p>{createCopy.description}</p>
+                      <h3>{createMode === 'video' ? createCopy.title : 'Photo Studio'}</h3>
+                      <p>{createMode === 'video' ? createCopy.description : 'Generate high-end AI visuals for your brand.'}</p>
                     </div>
 
-                    <label className="field">
-                      <span className="field__label">Campaign Name</span>
-                      <input
-                        type="text"
-                        className="field__control"
-                        placeholder="e.g. Summer Launch 2024"
-                        value={form.title}
-                        onChange={(event) =>
-                          setForm((current) => ({ ...current, title: event.target.value }))
-                        }
-                      />
-                    </label>
+                    {createMode === 'video' ? (
+                      <>
+                        <label className="field">
+                          <span className="field__label">Campaign Title</span>
+                          <input
+                            type="text"
+                            className="field__control"
+                            placeholder="e.g. Summer Skincare Launch"
+                            value={form.title}
+                            onChange={(event) =>
+                              setForm((current) => ({ ...current, title: event.target.value }))
+                            }
+                          />
+                        </label>
 
-                    <label className="field">
-                      <span className="field__label">Brief</span>
-                      <textarea
-                        className="field__control field__control--textarea"
-                        value={form.description}
-                        onChange={(event) =>
-                          setForm((current) => ({ ...current, description: event.target.value }))
-                        }
-                        rows={4}
-                      />
-                    </label>
+                        <label className="field">
+                          <span className="field__label">Brief</span>
+                          <textarea
+                            className="field__control field__control--textarea"
+                            placeholder="Describe your video ad campaign goal..."
+                            value={form.description}
+                            onChange={(event) =>
+                              setForm((current) => ({ ...current, description: event.target.value }))
+                            }
+                            rows={4}
+                          />
+                        </label>
+                      </>
+                    ) : (
+                      <>
+                        <label className="field">
+                          <span className="field__label">Photo Campaign Title</span>
+                          <input
+                            type="text"
+                            className="field__control"
+                            placeholder="e.g. Luxury Watch Hero Shot"
+                            value={photoTitle}
+                            onChange={(event) => setPhotoTitle(event.target.value)}
+                          />
+                        </label>
+
+                        <label className="field">
+                          <span className="field__label">Photo Prompt</span>
+                          <textarea
+                            className="field__control field__control--textarea"
+                            placeholder="Describe the scene, mood, materials, camera angle, lighting..."
+                            value={photoPrompt}
+                            onChange={(event) => setPhotoPrompt(event.target.value)}
+                            rows={5}
+                          />
+                        </label>
+                        
+                        <label className="field">
+                          <span className="field__label">Aspect Ratio</span>
+                          <select
+                            className="field__control"
+                            value={photoAspectRatio}
+                            onChange={(event) => setPhotoAspectRatio(event.target.value)}
+                          >
+                            <option value="1:1">1:1 Square</option>
+                            <option value="4:5">4:5 Portrait</option>
+                            <option value="16:9">16:9 Landscape</option>
+                          </select>
+                        </label>
+                      </>
+                    )}
 
                     <div className="field-grid">
                       <label className="field">
@@ -641,11 +823,24 @@ function DashboardPage() {
                       </label>
                     </div>
 
-                    {submitError ? <div className="studio-banner studio-banner--error">{submitError}</div> : null}
+                    {submitError || error ? (
+                      <div className="studio-banner studio-banner--error">{submitError || error}</div>
+                    ) : null}
 
-                    <button type="submit" className="submit-button" disabled={isSubmitting}>
-                      {isSubmitting ? 'SENDING...' : createCopy.submit}
+                    <button 
+                      type="submit" 
+                      className="submit-button" 
+                      disabled={createMode === 'video' ? isSubmitting : photoGenerating}
+                    >
+                      {createMode === 'video' 
+                        ? (isSubmitting ? 'QUEUEING...' : 'QUEUE VIDEO') 
+                        : (photoGenerating ? (photoProgressLabel || 'GENERATING...') : 'GENERATE 3 PHOTOS')}
                     </button>
+                    {photoGenerating && photoProgressLabel && (
+                      <div style={{ textAlign: 'center', fontSize: '10px', marginTop: '8px', fontWeight: 'bold', color: '#6366f1' }}>
+                        {photoProgressLabel}
+                      </div>
+                    )}
                   </form>
                 </article>
 
@@ -747,16 +942,28 @@ function DashboardPage() {
                     <div className="player__topline">
                       <div className="player__label">
                         <Sparkles size={14} strokeWidth={2.4} />
-                        <span>{activeJob?.title || (activeJob?.kind === 'photo' ? 'PHOTO LANE' : 'VIDEO REEL')}</span>
+                        <span>
+                          {creatorMode === 'video' 
+                            ? (activeJob?.title || 'VIDEO REEL')
+                            : (selectedPhotoAd?.title || 'PHOTO STUDIO')
+                          }
+                        </span>
                       </div>
                       <div className="player__badge">
-                        {activeJob ? formatDate(activeJob.createdAt) : 'NO JOB'}
+                        {creatorMode === 'video' 
+                          ? (activeJob ? formatDate(activeJob.createdAt) : 'NO JOB')
+                          : (selectedPhotoAd ? formatDate(selectedPhotoAd.createdAt) : 'NO SET')
+                        }
                       </div>
                     </div>
 
                     <div className="player__body">
                       <div className="player__title">
                         {(() => {
+                          if (creatorMode === 'photo') {
+                            if (!selectedPhotoAd) return 'Select a photo set from history';
+                            return <div className="post-preview">{selectedPhotoAd.prompt}</div>;
+                          }
                           if (!activeJob) return 'No job selected yet';
                           if (activeJob.kind === 'video') {
                             const vJob = activeJob as VideoJob;
@@ -783,7 +990,6 @@ function DashboardPage() {
                           return activeJob.description;
                         })()}
                       </div>
-
                     </div>
 
                     <div className="player__timing">
@@ -799,9 +1005,69 @@ function DashboardPage() {
                       </div>
                     </div>
 
-                    <div className="player__preview">
-                      <div className="player__preview-surface">
-                        {activeOutputUrl ? (
+                    <div className="player__preview player__preview--photo">
+                      <div className="player__preview-surface player__preview-surface--photo">
+                        {creatorMode === 'photo' ? (
+                          selectedPhotoAd ? (
+                            <div className="photo-studio-preview">
+                              {/* 3 Photos Horizontal with Save/Download buttons */}
+                              <div className="photo-concepts-grid">
+                                {selectedPhotoAd.images.map((image: any, index: number) => (
+                                  <div key={index} className="photo-concept-card">
+                                    <div className="photo-concept-label">Concept {index + 1}</div>
+                                    <img
+                                      src={image.url}
+                                      alt={`Concept ${index + 1}`}
+                                      className="photo-concept-img"
+                                    />
+                                    <a
+                                      href={image.url}
+                                      download={`${(selectedPhotoAd.title || 'photo').replace(/\s+/g, '-')}-concept-${index + 1}.jpg`}
+                                      className="photo-concept-save"
+                                      onClick={async (e) => {
+                                        e.preventDefault();
+                                        try {
+                                          const res = await fetch(image.url);
+                                          const blob = await res.blob();
+                                          const url = URL.createObjectURL(blob);
+                                          const a = document.createElement('a');
+                                          a.href = url;
+                                          a.download = `${(selectedPhotoAd.title || 'photo').replace(/\s+/g, '-')}-concept-${index + 1}.jpg`;
+                                          a.click();
+                                          URL.revokeObjectURL(url);
+                                        } catch {
+                                          window.open(image.url, '_blank');
+                                        }
+                                      }}
+                                    >
+                                      ⬇ SAVE PHOTO
+                                    </a>
+                                  </div>
+                                ))}
+                              </div>
+
+                              {/* Social Caption + Hashtags — below photos */}
+                              <div className="photo-caption-block">
+                                <p className="photo-caption-text">{selectedPhotoAd.prompt}</p>
+                                <div className="photo-caption-tags">
+                                  {(selectedPhotoAd.title || '').split(' ').filter(Boolean).slice(0, 4).map((w: string, i: number) => (
+                                    <span key={i} className="photo-caption-tag">#{w.toLowerCase().replace(/[^a-z0-9]/g, '')}</span>
+                                  ))}
+                                  {selectedPhotoAd.style && <span className="photo-caption-tag">#{selectedPhotoAd.style}</span>}
+                                  {selectedPhotoAd.productCategory && <span className="photo-caption-tag">#{selectedPhotoAd.productCategory.replace(/-/g, '')}</span>}
+                                  <span className="photo-caption-tag">#aimarketing</span>
+                                  <span className="photo-caption-tag">#brand</span>
+                                  <span className="photo-caption-tag">#contentcreator</span>
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="player__empty-state">
+                              <span>No photo set selected</span>
+                              <small>Generate a set or pick one from history</small>
+                            </div>
+                          )
+                        ) : activeOutputUrl ? (
                           activeJob?.kind === 'photo' ? (
                             <img
                               className="player__asset"
@@ -830,14 +1096,24 @@ function DashboardPage() {
                           )
                         ) : (
                           <div className="player__empty-state">
-                            <span>No preview yet</span>
-                            <small>Select a job or queue a new campaign</small>
+                            {puterStatus ? (
+                              <div className="puter-loader">
+                                <Sparkles className="puter-loader__icon" size={32} />
+                                <span>{puterStatus}</span>
+                                <small>Please wait, AI is painting your vision...</small>
+                              </div>
+                            ) : (
+                              <>
+                                <span>No preview yet</span>
+                                <small>Select a job or queue a new campaign</small>
+                              </>
+                            )}
                           </div>
                         )}
                       </div>
                     </div>
 
-                    <div className="player__actions">
+                    <div className="player__actions" style={creatorMode === 'photo' ? { display: 'none' } : {}}>
                       <button
                         type="button"
                         className="player-button player-button--solid"
@@ -936,32 +1212,60 @@ function DashboardPage() {
               </div>
 
               <div className="panel panel--history">
-                {selectedHistory.length > 0 ? (
-                  <div className="history-grid">
-                    {selectedHistory.map((job) => (
-                      <button
-                        key={job._id}
-                        type="button"
-                        className={`history-card${selectedJobId === job._id ? ' is-active' : ''}`}
-                        onClick={() => handleHistoryCardClick(job)}
-                      >
-                        <div className="history-card__top">
-                          <span className="history-card__title">{job.title || job.description || 'Untitled job'}</span>
-                          <span className="history-card__date">{formatDate(job.createdAt)}</span>
-                        </div>
-                        <div className="history-card__meta">
-                          <span className={`history-pill history-pill--${getStatusTone(job.status)}`}>
-                            {getStatusLabel(job.status)}
-                          </span>
-                          <span className="history-card__note">{job.message || 'Backend job item.'}</span>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
+                {historyMode === 'video' ? (
+                  selectedHistory.length > 0 ? (
+                    <div className="history-grid">
+                      {selectedHistory.map((job) => (
+                        <button
+                          key={job._id}
+                          type="button"
+                          className={`history-card${selectedJobId === job._id ? ' is-active' : ''}`}
+                          onClick={() => handleHistoryCardClick(job)}
+                        >
+                          <div className="history-card__top">
+                            <span className="history-card__title">{job.title || job.description || 'Untitled job'}</span>
+                            <span className="history-card__date">{formatDate(job.createdAt)}</span>
+                          </div>
+                          <div className="history-card__meta">
+                            <span className={`history-pill history-pill--${getStatusTone(job.status)}`}>
+                              {getStatusLabel(job.status)}
+                            </span>
+                            <span className="history-card__note">{job.message || 'Backend job item.'}</span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="history-empty">
+                      {isLoadingJobs ? 'Loading backend jobs...' : 'No video jobs found.'}
+                    </div>
+                  )
                 ) : (
-                  <div className="history-empty">
-                    {isLoadingJobs ? 'Loading backend jobs...' : 'No jobs found for this type yet.'}
-                  </div>
+                  photoAds.length > 0 ? (
+                    <div className="history-grid">
+                      {photoAds.map((ad) => (
+                        <button
+                          key={ad._id}
+                          type="button"
+                          className={`history-card${selectedPhotoAdId === ad._id ? ' is-active' : ''}`}
+                          onClick={() => handlePhotoCardClick(ad)}
+                        >
+                          <div className="history-card__top">
+                            <span className="history-card__title">{ad.title || 'Untitled photo set'}</span>
+                            <span className="history-card__date">{formatDate(ad.createdAt)}</span>
+                          </div>
+                          <div className="history-card__meta">
+                            <span className="history-pill history-pill--ready">READY</span>
+                            <span className="history-card__note">{ad.images.length} concepts · {ad.aspectRatio}</span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="history-empty">
+                      No photo sets found. Generate one in the Create section.
+                    </div>
+                  )
                 )}
               </div>
             </section>

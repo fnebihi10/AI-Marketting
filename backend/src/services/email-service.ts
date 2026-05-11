@@ -1,5 +1,5 @@
-const nodemailer = require('nodemailer');
-const config = require('../config');
+import nodemailer from 'nodemailer';
+import { config } from '../config';
 
 /**
  * Get the email transporter.
@@ -12,7 +12,7 @@ let transporterPromise = (async () => {
   if (isProduction) {
     return nodemailer.createTransport({
       host: config.email.host,
-      port: config.email.port,
+      port: config.email.port as number,
       secure: config.email.port == 465,
       auth: {
         user: config.email.user,
@@ -21,7 +21,7 @@ let transporterPromise = (async () => {
     });
   } else {
     // Local/Test environment: Generate Ethereal test account with retry logic
-    let testAccount;
+    let testAccount: any;
     for (let i = 0; i < 3; i++) {
         try {
             testAccount = await nodemailer.createTestAccount();
@@ -50,11 +50,18 @@ let transporterPromise = (async () => {
   }
 })();
 
+interface EmailOptions {
+  to: string;
+  subject: string;
+  text: string;
+  html: string;
+}
+
 /**
  * Send an email.
  * @param {Object} options - { to, subject, text, html }
  */
-const sendEmail = async (options) => {
+const sendEmail = async (options: EmailOptions) => {
   const transporter = await transporterPromise;
 
   const mailOptions = {
@@ -89,7 +96,7 @@ const sendEmail = async (options) => {
 /**
  * Send a reset password email.
  */
-const sendResetEmail = async (toEmail, resetUrl) => {
+export const sendResetEmail = async (toEmail: string, resetUrl: string) => {
   const subject = 'Reset Your Password';
   const text = `You requested a password reset. Please use the following link to reset your password: ${resetUrl}`;
   const html = `
@@ -107,15 +114,10 @@ const sendResetEmail = async (toEmail, resetUrl) => {
 /**
  * Send a welcome email.
  */
-const sendWelcomeEmail = async (toEmail) => {
+export const sendWelcomeEmail = async (toEmail: string) => {
   const subject = 'Welcome to AI Marketing Tool';
   const text = `Welcome! Your account has been successfully created.`;
   const html = `<h1>Welcome!</h1><p>Your account is ready.</p>`;
 
   return await sendEmail({ to: toEmail, subject, text, html });
-};
-
-module.exports = {
-  sendResetEmail,
-  sendWelcomeEmail,
 };

@@ -82,6 +82,7 @@ export interface AuthUser {
   id: string;
   email: string;
   role: string;
+  credits: number;
 }
 
 const authHeaders = (): Record<string, string> => {
@@ -155,6 +156,19 @@ export const resetPassword = async (token: string, password: string) => {
   }
 
   return payload as { message: string; user?: any; token?: string };
+};
+
+export const fetchMe = async () => {
+  const response = await fetch(`${API_BASE}/auth/me`, {
+    headers: authHeaders(),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch profile.');
+  }
+
+  const payload = await response.json();
+  return payload.user as AuthUser;
 };
 
 export const createJob = async (payload: {
@@ -235,6 +249,43 @@ export const fetchJobs = async () => {
   }
   const payload = await response.json();
   return payload.data as { videoJobs: VideoJob[]; photoJobs: PhotoJob[] };
+};
+
+export const fetchPhotoAds = async () => {
+  const response = await fetch(`${API_BASE}/photo-ads`, {
+    headers: authHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error('Failed to fetch photo ads.');
+  }
+  const payload = await response.json();
+  return payload.data as any[];
+};
+
+export const createPhotoAd = async (payload: {
+  title: string;
+  prompt: string;
+  aspectRatio: string;
+  productCategory: string;
+  style: string;
+  source: string;
+  imageDataUrls: string[];
+}) => {
+  const response = await fetch(`${API_BASE}/photo-ads`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeaders(),
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Failed to create photo ad.' }));
+    throw error;
+  }
+
+  return await response.json();
 };
 
 export const fetchJob = async (jobId: string) => {

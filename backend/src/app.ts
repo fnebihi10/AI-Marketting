@@ -3,8 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import { config } from './config';
 import router from './routes';
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const authRoutes = require(path.join(config.rootDir, 'src/routes/authRoutes.js'));
+import authRoutes from './routes/authRoutes';
 
 export const createApp = () => {
   const app = express();

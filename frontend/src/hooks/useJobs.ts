@@ -74,10 +74,21 @@ export const useJobs = (activeJobId: string | null) => {
     if (payload.stage === 'pending-image-generation' && payload.imagePrompt) {
       handlePuterImageGeneration(activeJobId, payload.imagePrompt, (msg) => {
         console.log('[Puter]', msg);
+        if (typeof (window as any).onPuterStatus === 'function') {
+          (window as any).onPuterStatus(msg);
+        }
       })
-        .then(() => loadJobs())
+        .then(() => {
+          loadJobs();
+          if (typeof (window as any).onPuterStatus === 'function') {
+            (window as any).onPuterStatus('');
+          }
+        })
         .catch((err: Error) => {
           console.error('[Puter] Image generation failed:', err.message);
+          if (typeof (window as any).onPuterStatus === 'function') {
+            (window as any).onPuterStatus(`Error: ${err.message}`);
+          }
         });
     }
   });

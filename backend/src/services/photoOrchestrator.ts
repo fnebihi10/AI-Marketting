@@ -26,7 +26,7 @@ const generatePhotoArtDirection = async (
   - caption: A persuasive social media post (hook + CTA) including 4-6 relevant hashtags.
   Return ONLY a JSON object with keys: "imagePrompt" and "caption".`;
 
-  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -43,7 +43,7 @@ const generatePhotoArtDirection = async (
   if (!response.ok) {
     const errorText = await response.text();
     console.error('[PhotoJob] OpenRouter Error:', errorText);
-    throw new Error('Art Direction failed (Check OpenRouter credits).');
+    throw new Error(`OpenRouter API error: ${response.status}`);
   }
 
   const data = await response.json();
@@ -77,12 +77,22 @@ export const processPhotoJob = async (jobId: string) => {
     });
 
     // Generate art direction via OpenRouter
-    const artDirection = await generatePhotoArtDirection(
-      job.description,
-      job.style,
-      job.productCategory,
-      isRedesign
-    );
+    let artDirection;
+    try {
+      artDirection = await generatePhotoArtDirection(
+        job.description,
+        job.style,
+        job.productCategory,
+        isRedesign
+      );
+    } catch (apiError) {
+      console.warn('[PhotoJob] Falling back to manual prompt due to:', apiError);
+      artDirection = {
+        imagePrompt: `Professional marketing photography for ${job.description}, style: ${job.style}, category: ${job.productCategory}, high resolution, commercial lighting.`,
+        caption: `Check out our new ${job.productCategory}! #marketing #ai #business`
+      };
+    }
+
     job.prompt = artDirection.imagePrompt;
     job.caption = artDirection.caption;
     await job.save();

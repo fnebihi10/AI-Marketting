@@ -9,18 +9,82 @@ import IORedis from 'ioredis';
 import mime from 'mime-types';
 import { VideoJob } from './models/VideoJob';
 import { PhotoJob } from './models/PhotoJob';
+import { PhotoAd } from './models/PhotoAd';
 import { config } from './config';
 import { videoQueue } from './queue';
-import { ensureDir, fileExists, relativeFrom, uniqueFile } from './utils/files';
+import { ensureDir, fileExists, relativeFrom, uniqueFile, slugify } from './utils/files';
 import { getJobChannel } from './services/jobProgressService';
 import { trimVideo } from './services/renderService';
 import { uploadAsset } from './services/storageService';
 import { processVideoJob } from './services/jobOrchestrator';
 import { processPhotoJob, completePhotoJobWithImage } from './services/photoOrchestrator';
 import { localJobEvents } from './services/localEventBus';
+import { protect } from './middleware/authMiddleware';
+import User from './models/User';
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
+
+const dataUrlPattern = /^data:(image\/(?:png|jpeg|jpg|webp));base64,(.+)$/i;
+const supportedImageMimeTypes = new Set(['image/png', 'image/jpeg', 'image/jpg', 'image/webp']);
+
+const decodeImageDataUrl = (dataUrl: string) => {
+  const match = dataUrlPattern.exec(dataUrl.trim());
+  if (!match) return null;
+
+  const mimeType = match[1].toLowerCase();
+  const base64Payload = match[2];
+  const extension = mime.extension(mimeType) || (mimeType === 'image/jpeg' ? 'jpg' : 'png');
+
+  return {
+    mimeType,
+    extension,
+    buffer: Buffer.from(base64Payload, 'base64')
+  };
+};
+
+const decodeRemoteImageUrl = async (imageUrl: string) => {
+  try {
+    const url = new URL(imageUrl);
+    if (!['http:', 'https:'].includes(url.protocol)) return null;
+
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Unable to download generated image (${response.status}).`);
+
+    const mimeType = (response.headers.get('content-type') || '').split(';')[0].toLowerCase();
+    if (!supportedImageMimeTypes.has(mimeType)) {
+      throw new Error(`Generated image URL returned unsupported content type: ${mimeType || 'unknown'}.`);
+    }
+
+    const extension = mime.extension(mimeType) || (mimeType === 'image/jpeg' ? 'jpg' : 'png');
+    return {
+      mimeType,
+      extension,
+      buffer: Buffer.from(await response.arrayBuffer())
+    };
+  } catch {
+    return null;
+  }
+};
+
+const decodeGeneratedImage = async (imageSource: string) =>
+  decodeImageDataUrl(imageSource) || decodeRemoteImageUrl(imageSource);
+
+const sanitizeStorageAsset = (asset: any) => {
+  if (!asset) return asset;
+  const { localPath, ...rest } = asset;
+  return rest;
+};
+
+const sanitizePhotoAd = (photoAd: any) => {
+  if (!photoAd) return photoAd;
+  const plainPhotoAd = typeof photoAd.toObject === 'function' ? photoAd.toObject() : { ...photoAd };
+  delete plainPhotoAd.owner;
+  plainPhotoAd.images = Array.isArray(plainPhotoAd.images)
+    ? plainPhotoAd.images.map((asset: any) => sanitizeStorageAsset(asset))
+    : [];
+  return plainPhotoAd;
+};
 
 router.get('/health', (_req, res) => {
   res.json({ status: 'ok', project: 'AI Marketing Studio MVP' });
@@ -36,8 +100,106 @@ router.get('/jobs', async (_req, res, next) => {
   }
 });
 
-router.post('/photo-jobs', upload.array('images', 2), async (req, res, next) => {
+router.get('/photo-ads', protect, async (req: any, res, next) => {
   try {
+    const userId = req.user.userId;
+    const photoAds = await PhotoAd.find({ owner: userId })
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .lean();
+    res.json({ data: photoAds.map((ad) => sanitizePhotoAd(ad)) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/photo-ads', protect, async (req: any, res, next) => {
+  try {
+    const userId = req.user.userId;
+    const { title, prompt, aspectRatio, productCategory, style, source, imageDataUrls } = req.body;
+
+    if (!title || !prompt || !imageDataUrls?.length) {
+      res.status(400).json({ message: 'Title, prompt, and images are required.' });
+      return;
+    }
+
+    const user = await User.findById(userId);
+    if (!user || user.credits < 1) {
+      res.status(403).json({ message: 'Insufficient credits.' });
+      return;
+    }
+
+    const photoAd = new PhotoAd({
+      owner: userId,
+      title,
+      prompt,
+      aspectRatio,
+      productCategory,
+      style,
+      source: source || 'puter',
+      images: []
+    });
+
+    const tempDir = path.join(config.workingDir, 'photo-ads', String(photoAd._id));
+    await ensureDir(tempDir);
+
+    const decodedImages = [];
+    for (let i = 0; i < imageDataUrls.length; i++) {
+      const decoded = await decodeGeneratedImage(imageDataUrls[i]);
+      if (!decoded) {
+        res.status(400).json({ message: `Image ${i + 1} is invalid.` });
+        return;
+      }
+      decodedImages.push(decoded);
+    }
+
+    // Deduct credit
+    user.credits -= 1;
+    await user.save();
+
+    const uploadedImages = [];
+    for (let i = 0; i < decodedImages.length; i++) {
+      const decoded = decodedImages[i];
+      const tempFilePath = path.join(tempDir, uniqueFile(`photo-${i + 1}`, decoded.extension));
+      await fs.writeFile(tempFilePath, decoded.buffer);
+
+      const assetKey = `${photoAd._id}/images/${String(i + 1).padStart(2, '0')}-${slugify(title)}.${decoded.extension}`;
+      const uploadedAsset = await uploadAsset(tempFilePath, assetKey);
+      await fs.unlink(tempFilePath).catch(() => undefined);
+      uploadedImages.push(uploadedAsset);
+    }
+
+    photoAd.images = uploadedImages;
+    await photoAd.save();
+
+    res.status(201).json({ data: sanitizePhotoAd(photoAd), credits: user.credits });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/photo-ads/:photoAdId', protect, async (req: any, res, next) => {
+  try {
+    const userId = req.user.userId;
+    const photoAd = await PhotoAd.findOne({ _id: req.params.photoAdId, owner: userId }).lean();
+    if (!photoAd) {
+      res.status(404).json({ message: 'Photo ad not found.' });
+      return;
+    }
+    res.json({ data: sanitizePhotoAd(photoAd) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/photo-jobs', protect, upload.array('images', 2), async (req: any, res, next) => {
+  try {
+    const user = await User.findById(req.user.userId);
+    if (!user || user.credits < 1) {
+      res.status(403).json({ message: 'Insufficient credits. Please upgrade your plan.' });
+      return;
+    }
+
     const title = String(req.body.title || '').trim();
     const description = String(req.body.description || '').trim();
     const style = String(req.body.style || '').trim();
@@ -95,14 +257,23 @@ router.post('/photo-jobs', upload.array('images', 2), async (req, res, next) => 
       });
     });
 
+    user.credits -= 1;
+    await user.save();
+
     res.status(201).json({ data: job });
   } catch (error) {
     next(error);
   }
 });
 
-router.post('/jobs', upload.array('images', 2), async (req, res, next) => {
+router.post('/jobs', protect, upload.array('images', 2), async (req: any, res, next) => {
   try {
+    const user = await User.findById(req.user.userId);
+    if (!user || user.credits < 1) {
+      res.status(403).json({ message: 'Insufficient credits. Please upgrade your plan.' });
+      return;
+    }
+
     const title = String(req.body.title || '').trim();
     const description = String(req.body.description || '').trim();
     const style = String(req.body.style || '').trim();
@@ -193,6 +364,9 @@ router.post('/jobs', upload.array('images', 2), async (req, res, next) => {
         });
       });
     }
+    
+    user.credits -= 1;
+    await user.save();
 
     await job.save();
 

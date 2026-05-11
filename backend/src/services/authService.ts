@@ -1,7 +1,7 @@
-const crypto = require('crypto');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const User = require('../models/User');
+import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import User from '../models/User';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -10,9 +10,9 @@ const User = require('../models/User');
  * @param {string} userId
  * @returns {string} signed JWT
  */
-const signToken = (userId) =>
-  jwt.sign({ userId }, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRES_IN || '1d',
+const signToken = (userId: any) =>
+  jwt.sign({ userId }, process.env.JWT_SECRET as string, {
+    expiresIn: (process.env.JWT_EXPIRES_IN || '1d') as any,
   });
 
 // ─── Service Functions ────────────────────────────────────────────────────────
@@ -21,11 +21,11 @@ const signToken = (userId) =>
  * Register a new user.
  * Hashes the password and returns a JWT on success.
  */
-const registerUser = async (email, password) => {
+export const registerUser = async (email: string, password: string) => {
   // Check for existing user
   const existing = await User.findOne({ email: email.toLowerCase() });
   if (existing) {
-    const err = new Error('An account with this email already exists');
+    const err = new Error('An account with this email already exists') as any;
     err.statusCode = 409;
     throw err;
   }
@@ -38,54 +38,54 @@ const registerUser = async (email, password) => {
   const user = await User.create({ email, password: hashedPassword });
 
   const token = signToken(user._id);
-  return { token, user: { id: user._id, email: user.email, role: user.role, createdAt: user.createdAt } };
+  return { token, user: { id: user._id, email: user.email, role: user.role, credits: user.credits, createdAt: user.createdAt } };
 };
 
 /**
  * Log in an existing user.
  * Returns a JWT on success.
  */
-const loginUser = async (email, password) => {
+export const loginUser = async (email: string, password: string) => {
   // Fetch user including password field (excluded by default)
   const user = await User.findOne({ email: email.toLowerCase() }).select('+password');
   if (!user) {
-    const err = new Error('Invalid email or password');
+    const err = new Error('Invalid email or password') as any;
     err.statusCode = 401;
     throw err;
   }
 
-  const isMatch = await bcrypt.compare(password, user.password);
+  const isMatch = await bcrypt.compare(password, user.password as string);
   if (!isMatch) {
-    const err = new Error('Invalid email or password');
+    const err = new Error('Invalid email or password') as any;
     err.statusCode = 401;
     throw err;
   }
 
   const token = signToken(user._id);
-  return { token, user: { id: user._id, email: user.email, role: user.role, createdAt: user.createdAt } };
+  return { token, user: { id: user._id, email: user.email, role: user.role, credits: user.credits, createdAt: user.createdAt } };
 };
 
 /**
  * Fetch a user by ID (for the /me route).
  */
-const getUserById = async (userId) => {
+export const getUserById = async (userId: string) => {
   const user = await User.findById(userId);
   if (!user) {
-    const err = new Error('User not found');
+    const err = new Error('User not found') as any;
     err.statusCode = 404;
     throw err;
   }
-  return { id: user._id, email: user.email, role: user.role, createdAt: user.createdAt };
+  return { id: user._id, email: user.email, role: user.role, credits: user.credits, createdAt: user.createdAt };
 };
 
 /**
  * Generate a password reset token.
  * Saves a hashed token to the user document and returns the plain token (to simulate emailing it).
  */
-const generateResetToken = async (email) => {
+export const generateResetToken = async (email: string) => {
   const user = await User.findOne({ email: email.toLowerCase() });
   if (!user) {
-    const err = new Error('No user found with that email');
+    const err = new Error('No user found with that email') as any;
     err.statusCode = 404;
     throw err;
   }
@@ -95,7 +95,7 @@ const generateResetToken = async (email) => {
   
   // Hash it before saving to DB
   user.resetPasswordToken = crypto.createHash('sha256').update(resetToken).digest('hex');
-  user.resetPasswordExpires = Date.now() + 60 * 60 * 1000; // 1 hour
+  user.resetPasswordExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
   await user.save();
   return resetToken;
@@ -105,7 +105,7 @@ const generateResetToken = async (email) => {
  * Reset password using the token.
  * Validates token, hashes the new password, and returns a fresh JWT.
  */
-const resetPassword = async (token, newPassword) => {
+export const resetPassword = async (token: string, newPassword: string) => {
   const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
 
   const user = await User.findOne({
@@ -114,7 +114,7 @@ const resetPassword = async (token, newPassword) => {
   });
 
   if (!user) {
-    const err = new Error('Invalid or expired reset token');
+    const err = new Error('Invalid or expired reset token') as any;
     err.statusCode = 400;
     throw err;
   }
@@ -129,7 +129,5 @@ const resetPassword = async (token, newPassword) => {
   await user.save();
 
   const jwtToken = signToken(user._id);
-  return { token: jwtToken, user: { id: user._id, email: user.email, role: user.role, createdAt: user.createdAt } };
+  return { token: jwtToken, user: { id: user._id, email: user.email, role: user.role, credits: user.credits, createdAt: user.createdAt } };
 };
-
-module.exports = { registerUser, loginUser, getUserById, generateResetToken, resetPassword };

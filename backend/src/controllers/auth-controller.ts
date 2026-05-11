@@ -1,17 +1,18 @@
-const { registerUser, loginUser, getUserById, generateResetToken, resetPassword: resetPasswordService } = require('../services/authService');
-const { sendResetEmail } = require('../services/emailService');
+import { Request, Response, NextFunction } from 'express';
+import { registerUser, loginUser, getUserById, generateResetToken, resetPassword as resetPasswordService } from '../services/authService';
+import { sendResetEmail } from '../services/email-service';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /** Basic email format validation */
-const isValidEmail = (email) => /^\S+@\S+\.\S+$/.test(email);
+const isValidEmail = (email: string) => /^\S+@\S+\.\S+$/.test(email);
 
 // ─── Controllers ──────────────────────────────────────────────────────────────
 
 /**
  * POST /api/auth/register
  */
-const register = async (req, res, next) => {
+export const register = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { email, password } = req.body;
 
@@ -35,7 +36,7 @@ const register = async (req, res, next) => {
 /**
  * POST /api/auth/login
  */
-const login = async (req, res, next) => {
+export const login = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { email, password } = req.body;
 
@@ -53,7 +54,7 @@ const login = async (req, res, next) => {
 /**
  * GET /api/auth/me  (protected)
  */
-const getMe = async (req, res, next) => {
+export const getMe = async (req: any, res: Response, next: NextFunction) => {
   try {
     const user = await getUserById(req.user.userId);
     return res.status(200).json({ success: true, user });
@@ -65,7 +66,7 @@ const getMe = async (req, res, next) => {
 /**
  * POST /api/auth/forgot-password
  */
-const forgotPassword = async (req, res, next) => {
+export const forgotPassword = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { email } = req.body;
     if (!email || !isValidEmail(email)) {
@@ -80,9 +81,9 @@ const forgotPassword = async (req, res, next) => {
 
     // Attempt to send email; if it fails, still return resetUrl for local testing
     try {
-      const { previewUrl } = await sendResetEmail(email, resetUrl);
+      const { previewUrl } = await sendResetEmail(email, resetUrl) as any;
       return res.status(200).json({ success: true, message: 'Reset email sent', resetUrl, previewUrl });
-    } catch (sendErr) {
+    } catch (sendErr: any) {
       return res.status(200).json({ success: true, message: 'Token generated (email send failed)', resetUrl, error: sendErr.message });
     }
   } catch (err) {
@@ -93,18 +94,16 @@ const forgotPassword = async (req, res, next) => {
 /**
  * PUT /api/auth/reset-password/:token
  */
-const resetPassword = async (req, res, next) => {
+export const resetPassword = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { password } = req.body;
     if (!password || password.length < 6) {
       return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
     }
 
-    const data = await resetPasswordService(req.params.token, password);
+    const data = await resetPasswordService(req.params.token as string, password);
     return res.status(200).json({ success: true, message: 'Password reset successful', ...data });
   } catch (err) {
     next(err);
   }
 };
-
-module.exports = { register, login, getMe, forgotPassword, resetPassword };

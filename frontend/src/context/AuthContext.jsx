@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { fetchMe } from '../lib/api';
 
 const AuthContext = createContext(null);
 
@@ -81,8 +82,19 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('user');
   };
 
+  /** Refresh user data from API */
+  const refreshUser = async () => {
+    try {
+      const userData = await fetchMe();
+      setUser(userData);
+      localStorage.setItem('user', JSON.stringify(userData));
+    } catch (err) {
+      console.error('Failed to refresh user:', err);
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, loading, isExpired, setIsExpired }}>
+    <AuthContext.Provider value={{ user, token, login, logout, refreshUser, loading, isExpired, setIsExpired }}>
       {children}
     </AuthContext.Provider>
   );
