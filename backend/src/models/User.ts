@@ -7,6 +7,7 @@ export interface IUser extends Document {
   credits: number;
   resetPasswordToken?: string;
   resetPasswordExpires?: Date;
+  creditedSessions?: string[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -39,6 +40,10 @@ const userSchema = new Schema<IUser>(
     },
     resetPasswordToken: String,
     resetPasswordExpires: Date,
+    creditedSessions: {
+      type: [String],
+      default: []
+    },
   },
   { timestamps: true }
 );

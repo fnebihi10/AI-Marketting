@@ -7,7 +7,7 @@ import { Sun, Moon } from 'lucide-react';
 import BrandLogo from '../components/common/BrandLogo';
 
 const ForgotPasswordPage = () => {
-  const { lang, toggleLanguage, t } = useLanguage();
+  const { t } = useLanguage();
   const { theme, toggleTheme } = useTheme();
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
@@ -42,15 +42,7 @@ const ForgotPasswordPage = () => {
   return (
     <div className="auth-wrapper">
       <div className="auth-controls-row">
-        <button
-          className="auth-theme-toggle"
-          onClick={toggleLanguage}
-          title={lang === 'sq' ? 'Switch to English' : 'Kalo ne shqip'}
-        >
-          <span style={{ fontSize: '0.75rem', fontWeight: 800 }}>
-            {lang === 'sq' ? 'EN' : 'AL'}
-          </span>
-        </button>
+
         <button
           className="auth-theme-toggle"
           onClick={toggleTheme}

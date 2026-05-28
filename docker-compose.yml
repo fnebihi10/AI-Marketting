@@ -15,43 +15,5 @@ services:
     ports:
       - '6379:6379'
 
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    env_file:
-      - ./backend/.env
-    depends_on:
-      - mongodb
-      - redis
-    ports:
-      - '5000:5000'
-    volumes:
-      - ./backend/storage:/app/storage
-
-  worker:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    command: npm run worker
-    env_file:
-      - ./backend/.env
-    depends_on:
-      - mongodb
-      - redis
-    volumes:
-      - ./backend/storage:/app/storage
-
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    environment:
-      VITE_API_BASE_URL: http://backend:5000/api
-    depends_on:
-      - backend
-    ports:
-      - '5173:80'
-
 volumes:
   mongo-data:

@@ -409,6 +409,38 @@ router.get('/jobs/:jobId', async (req, res, next) => {
   }
 });
 
+router.delete('/jobs/:jobId', protect, async (req: any, res, next) => {
+  try {
+    const { jobId } = req.params;
+    if (!jobId.match(/^[0-9a-fA-F]{24}$/)) {
+      res.status(400).json({ message: 'Invalid Job ID format.' });
+      return;
+    }
+
+    // Try to delete from VideoJob, PhotoJob, or PhotoAd
+    let deleted = await VideoJob.findByIdAndDelete(jobId);
+    if (!deleted) {
+      deleted = await PhotoJob.findByIdAndDelete(jobId);
+    }
+    if (!deleted) {
+      // For PhotoAd we should also ensure owner matches, but since we are just deleting by ID and we have the protect middleware, we verify owner.
+      const ad = await PhotoAd.findById(jobId);
+      if (ad && ad.owner.toString() === req.user.userId.toString()) {
+         deleted = await PhotoAd.findByIdAndDelete(jobId);
+      }
+    }
+
+    if (!deleted) {
+      res.status(404).json({ message: 'Job not found or unauthorized.' });
+      return;
+    }
+
+    res.json({ success: true, message: 'Job deleted successfully.' });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.get('/jobs/:jobId/events', async (req, res, next) => {
   const { jobId } = req.params;
   const subscriber =

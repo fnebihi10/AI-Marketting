@@ -97,14 +97,19 @@ const sendEmail = async (options: EmailOptions) => {
  * Send a reset password email.
  */
 export const sendResetEmail = async (toEmail: string, resetUrl: string) => {
-  const subject = 'Reset Your Password';
-  const text = `You requested a password reset. Please use the following link to reset your password: ${resetUrl}`;
+  const subject = 'Reset Your Password - AI Marketing Studio';
+  const text = `You requested a password reset. Please use the following link to reset your password: ${resetUrl}\n\nThis link is valid for 1 hour.`;
   const html = `
-    <div style="font-family: sans-serif; line-height: 1.6; color: #333;">
-      <h2>Password Reset Request</h2>
-      <p>Click the button below to reset your password. This link is valid for 1 hour.</p>
-      <a href="${resetUrl}" style="display: inline-block; padding: 10px 20px; background-color: #4F46E5; color: white; text-decoration: none; border-radius: 5px;">Reset Password</a>
-      <p>If you did not request this, please ignore this email.</p>
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #E5E7EB; background-color: #0B0F19; padding: 40px 20px; text-align: center;">
+      <div style="max-width: 500px; margin: 0 auto; background-color: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 40px 30px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);">
+        <h2 style="color: #FFFFFF; font-size: 24px; font-weight: 600; margin-top: 0; margin-bottom: 16px; letter-spacing: -0.5px;">Reset your password</h2>
+        <p style="color: #9CA3AF; font-size: 15px; margin-bottom: 32px;">We received a request to reset the password for your AI Marketing Studio account. Click the button below to choose a new one.</p>
+        <a href="${resetUrl}" style="display: inline-block; padding: 12px 28px; background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%); color: #FFFFFF; font-size: 15px; font-weight: 600; text-decoration: none; border-radius: 8px; box-shadow: 0 4px 14px 0 rgba(99, 102, 241, 0.39);">Reset Password</a>
+        <p style="color: #6B7280; font-size: 13px; margin-top: 32px; margin-bottom: 0;">This link is valid for 1 hour. If you didn't request this, you can safely ignore this email.</p>
+      </div>
+      <div style="margin-top: 24px; color: #4B5563; font-size: 12px;">
+        &copy; ${new Date().getFullYear()} AI Marketing Studio. All rights reserved.
+      </div>
     </div>
   `;
 

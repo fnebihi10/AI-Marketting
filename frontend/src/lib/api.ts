@@ -345,3 +345,43 @@ export const completePhotoJob = async (jobId: string, imageBlob: Blob) => {
 };
 
 export const getJobEventsUrl = (jobId: string) => `${API_BASE}/jobs/${jobId}/events`;
+
+export const createCheckoutSession = async (packageId: string) => {
+  const response = await fetch(`${API_BASE}/billing/create-checkout-session`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeaders(),
+    },
+    body: JSON.stringify({ packageId }),
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Failed to create payment session.' }));
+    throw new Error(error.message || 'Failed to create payment session.');
+  }
+  return await response.json() as { url: string };
+};
+
+export const verifyBillingSession = async (sessionId: string) => {
+  const response = await fetch(`${API_BASE}/billing/verify-session?session_id=${sessionId}`, {
+    headers: authHeaders(),
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Session verification failed.' }));
+    throw new Error(error.message || 'Session verification failed.');
+  }
+  return await response.json() as { success: boolean; wasCredited: boolean; credits: number; message: string };
+};
+
+export const deleteJob = async (jobId: string) => {
+  const response = await fetch(`${API_BASE}/jobs/${jobId}`, {
+    method: 'DELETE',
+    headers: authHeaders(),
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Failed to delete job.' }));
+    throw new Error(error.message || 'Failed to delete job.');
+  }
+  return await response.json() as { success: boolean; message: string };
+};
+

@@ -4,6 +4,7 @@ import cors from 'cors';
 import { config } from './config';
 import router from './routes';
 import authRoutes from './routes/authRoutes';
+import billingRoutes from './routes/billingRoutes';
 
 export const createApp = () => {
   const app = express();
@@ -13,6 +14,7 @@ export const createApp = () => {
       origin: config.frontendUrl
     })
   );
+  app.use('/api/billing/webhook', express.raw({ type: 'application/json' }));
   app.use(express.json({ limit: '10mb' }));
   const staticOptions = {
     acceptRanges: true,
@@ -40,6 +42,7 @@ export const createApp = () => {
   });
 
   app.use('/api/auth', authRoutes);
+  app.use('/api/billing', billingRoutes);
   app.use('/api', router);
 
   app.use((error: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

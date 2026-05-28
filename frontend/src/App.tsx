@@ -8,7 +8,10 @@ import {
 } from 'react';
 import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import {
+  Check,
   ChevronDown,
+  Copy,
+  Download,
   Eye,
   Folder,
   History,
@@ -16,9 +19,13 @@ import {
   LogOut,
   Moon,
   Plus,
+  ShieldCheck,
   Sparkles,
   Sun,
+  Tag,
+  Trash2,
   Upload,
+  Users,
   X,
 } from 'lucide-react';
 import logoWhite from './assets/logo-white.png';
@@ -32,11 +39,12 @@ import RegisterPage from './pages/RegisterPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import { useJobs, useCampaignForm, type CampaignKind, type DashboardJob } from './hooks';
 import { generatePhotoAdSet } from './lib/puter';
-import { createPhotoAd, fetchPhotoAds } from './lib/api';
+import { createPhotoAd, fetchPhotoAds, createCheckoutSession, verifyBillingSession, deleteJob } from './lib/api';
+import CreditStoreModal from './components/CreditStoreModal';
 
 type SectionKey = 'dashboard' | 'create' | 'workspace' | 'history';
 type CreateFocus = CampaignKind | 'upload';
-type WorkspaceFocus = 'preview' | 'brief';
+type WorkspaceFocus = 'preview' | 'publish';
 
 const createModes: Array<{
   kind: CampaignKind;
@@ -159,6 +167,8 @@ function DashboardPage() {
 
   const [createMode, setCreateMode] = useState<CampaignKind>('video');
   const [historyMode, setHistoryMode] = useState<CampaignKind>('video');
+  const [historyPage, setHistoryPage] = useState(1);
+  const historyPageSize = 8;
   const [activeSection, setActiveSection] = useState<SectionKey>('dashboard');
   const [expandedSection, setExpandedSection] = useState<SectionKey | null>('create');
   const [createFocus, setCreateFocus] = useState<CreateFocus>('video');
@@ -174,13 +184,116 @@ function DashboardPage() {
   const [error, setError] = useState('');
   const [selectedPhotoImageIdx, setSelectedPhotoImageIdx] = useState<number | null>(null);
   const [briefTab, setBriefTab] = useState<'audience' | 'offer' | 'proof'>('audience');
+  const [copied, setCopied] = useState(false);
+  const [activeSocialModal, setActiveSocialModal] = useState<'facebook' | 'instagram' | 'tiktok' | null>(null);
+  const [customAlert, setCustomAlert] = useState<{ title: string; message: string } | null>(null);
+  const [isCreditStoreOpen, setIsCreditStoreOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const handlePurchaseInitiated = async (packageId: string) => {
+    try {
+      const data = await createCheckoutSession(packageId);
+      if (data && data.url) {
+        window.location.href = data.url;
+      }
+    } catch (err: any) {
+      setCustomAlert({
+        title: 'Payment Error',
+        message: err.message || 'Could not connect to Stripe. Please try again later.'
+      });
+    }
+  };
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const payment = params.get('payment');
+    const sessionId = params.get('session_id');
+
+    if (payment === 'success' && sessionId) {
+      verifyBillingSession(sessionId)
+        .then((res) => {
+          if (res.success) {
+            setCustomAlert({
+              title: 'Purchase Successful!',
+              message: `Thank you for your purchase! ${res.credits} credits have been successfully added to your account.`
+            });
+            refreshUser();
+          }
+        })
+        .catch((err) => {
+          setCustomAlert({
+            title: 'Verification Failed',
+            message: err.message || 'Could not verify your payment session.'
+          });
+        })
+        .finally(() => {
+          const newUrl = window.location.pathname;
+          window.history.replaceState({}, document.title, newUrl);
+        });
+    } else if (payment === 'cancel') {
+      setCustomAlert({
+        title: 'Payment Cancelled',
+        message: 'Your credit purchase transaction was cancelled. No charges were made.'
+      });
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, document.title, newUrl);
+    }
+  }, []);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => {
+      setToastMessage((current) => current === msg ? null : current);
+    }, 4000);
+  };
+
+  const handleCopyCaption = () => {
+    let textToCopy = '';
+    if (creatorMode === 'photo' && selectedPhotoAd) {
+      textToCopy = selectedPhotoAd.prompt;
+    } else if (activeJob && activeJob.kind === 'video') {
+      const vJob = activeJob as VideoJob;
+      textToCopy = vJob.caption || '';
+      if (!textToCopy && vJob.script) {
+        textToCopy = `${vJob.script.hook || vJob.script.title || vJob.description} ${vJob.script.cta}`;
+      }
+    }
+    if (textToCopy) {
+      navigator.clipboard.writeText(textToCopy);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const handleDownloadAsset = async () => {
+    if (!activeOutputUrl) return;
+    try {
+      const res = await fetch(activeOutputUrl);
+      if (!res.ok) throw new Error('Response not OK');
+      const blob = await res.blob();
+      if (blob.type.includes('html') || blob.type.includes('json')) {
+        throw new Error('Invalid file type');
+      }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `campaign-asset-${Date.now()}.${creatorMode === 'video' ? 'mp4' : 'jpg'}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      window.open(activeOutputUrl, '_blank');
+    }
+  };
 
   const {
     jobs,
     combinedJobs,
     isLoading: isLoadingJobs,
     error: loadError,
-    loadJobs
+    loadJobs,
+    removeJob
   } = useJobs(selectedJobId);
 
   const dashboardSectionRef = useRef<HTMLElement | null>(null);
@@ -252,7 +365,15 @@ function DashboardPage() {
   const queuedCount = combinedJobs.filter(
     (job) => job.status === 'processing' || job.status === 'queued'
   ).length;
-  const selectedHistory = combinedJobs.filter((job) => job.kind === historyMode).slice(0, 8);
+
+  const filteredHistory = combinedJobs.filter((job) => job.kind === historyMode);
+  const totalHistoryPages = Math.ceil(filteredHistory.length / historyPageSize) || 1;
+  const selectedHistory = filteredHistory.slice((historyPage - 1) * historyPageSize, historyPage * historyPageSize);
+
+  const filteredPhotoAds = photoAds;
+  const totalPhotoHistoryPages = Math.ceil(filteredPhotoAds.length / historyPageSize) || 1;
+  const selectedPhotoAds = filteredPhotoAds.slice((historyPage - 1) * historyPageSize, historyPage * historyPageSize);
+
   const activeProgress =
     activeJob?.progress ?? (activeJob?.status === 'completed' ? 100 : activeJob?.status ? 20 : 0);
   const [puterStatus, setPuterStatus] = useState<string>('');
@@ -262,6 +383,7 @@ function DashboardPage() {
   }, []);
   const userInitials = getInitials(user?.email);
   const userLabel = user?.email?.split('@')[0] || 'AI Studio';
+  const userDisplayName = user?.name || userLabel.split('.').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 
   const createCopy =
     createMode === 'video'
@@ -269,7 +391,7 @@ function DashboardPage() {
           tag: 'VIDEO',
           title: 'Create a Video Campaign',
           description: 'Turn a short brief into a polished video asset with style, category, and upload controls ready.',
-          submit: 'QUEUE VIDEO',
+          submit: 'CREATE',
         }
       : {
           tag: 'PHOTO',
@@ -331,8 +453,28 @@ function DashboardPage() {
   const selectHistoryMode = (mode: CampaignKind) => {
     setHistoryMode(mode);
     setCreatorMode(mode);
+    setHistoryPage(1);
     setActiveSection('history');
     setExpandedSection('history');
+  };
+
+  const handleDeleteJob = async (jobId: string, type: 'job' | 'ad', e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!window.confirm('Are you sure you want to delete this job?')) return;
+    try {
+      await deleteJob(jobId);
+      if (type === 'job') {
+        removeJob(jobId);
+        if (selectedJobId === jobId) setSelectedJobId(null);
+      } else {
+        setPhotoAds((current) => current.filter(ad => ad._id !== jobId));
+        if (selectedPhotoAdId === jobId) setSelectedPhotoAdId(null);
+      }
+      showToast('Job deleted successfully');
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to delete job.');
+    }
   };
 
   const handlePhotoCardClick = (ad: any) => {
@@ -579,11 +721,22 @@ function DashboardPage() {
                       </button>
                       <button
                         type="button"
-                        className={`sidebar-dropdown-item${workspaceFocus === 'brief' ? ' is-active' : ''}`}
-                        onClick={() => selectWorkspaceFocus('brief')}
+                        className={`sidebar-dropdown-item${workspaceFocus === 'publish' ? ' is-active' : ''}`}
+                        onClick={() => {
+                          selectWorkspaceFocus('publish');
+                          setActiveSection('workspace');
+                          setTimeout(() => {
+                            const el = document.querySelector('.social-simulator-actions');
+                            if (el) {
+                              el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                              el.classList.add('highlight-flash');
+                              setTimeout(() => el.classList.remove('highlight-flash'), 1800);
+                            }
+                          }, 100);
+                        }}
                       >
-                        <span>Campaign Brief</span>
-                        <small>Message, chips and context</small>
+                        <span>Social Publish</span>
+                        <small>Simulate post on FB, IG, TikTok</small>
                       </button>
                     </div>
                   ) : null}
@@ -620,21 +773,51 @@ function DashboardPage() {
               <span>{userInitials}</span>
             </div>
             <div className="sidebar-footer__identity">
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                 <strong>{userLabel}</strong>
-                <span style={{ 
-                  fontSize: '10px', 
-                  color: '#f59e0b', 
-                  background: 'rgba(245, 158, 11, 0.15)', 
-                  padding: '2px 6px', 
-                  borderRadius: '4px',
-                  fontWeight: 700,
-                  border: '1px solid rgba(245, 158, 11, 0.3)',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px'
-                }}>
-                  {user?.credits ?? 0} CREDITS
-                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ 
+                    fontSize: '10px', 
+                    color: '#f59e0b', 
+                    background: 'rgba(245, 158, 11, 0.15)', 
+                    padding: '2px 6px', 
+                    borderRadius: '4px',
+                    fontWeight: 700,
+                    border: '1px solid rgba(245, 158, 11, 0.3)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>
+                    {user?.credits ?? 0} CREDITS
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setIsCreditStoreOpen(true)}
+                    style={{
+                      fontSize: '9px',
+                      color: '#a78bfa',
+                      background: 'rgba(139, 92, 246, 0.15)',
+                      padding: '2px 6px',
+                      borderRadius: '4px',
+                      fontWeight: 800,
+                      border: '1px solid rgba(139, 92, 246, 0.3)',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      lineHeight: '1.2'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = '#8b5cf6';
+                      e.currentTarget.style.color = 'white';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'rgba(139, 92, 246, 0.15)';
+                      e.currentTarget.style.color = '#a78bfa';
+                    }}
+                  >
+                    + BUY
+                  </button>
+                </div>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                 <small>Workspace owner</small>
@@ -875,7 +1058,7 @@ function DashboardPage() {
                       disabled={createMode === 'video' ? isSubmitting : photoGenerating}
                     >
                       {createMode === 'video' 
-                        ? (isSubmitting ? 'QUEUEING...' : 'QUEUE VIDEO') 
+                        ? (isSubmitting ? 'CREATING...' : 'CREATE') 
                         : (photoGenerating ? (photoProgressLabel || 'GENERATING...') : 'GENERATE 3 PHOTOS')}
                     </button>
                     {photoGenerating && photoProgressLabel && (
@@ -950,331 +1133,312 @@ function DashboardPage() {
           )}
 
           {activeSection === 'workspace' && (
-            <section className="feature-section" ref={workspaceSectionRef}>
+            <section className="feature-section feature-section--workspace-unified" ref={workspaceSectionRef}>
               <div className="feature-section__header">
                 <div>
                   <div className="panel-kicker">WORKSPACE</div>
-                  <h2>Preview the selected output</h2>
+                  <h2>Live preview & campaign details</h2>
                   <p>
-                    Review the active asset, monitor progress, and keep the original campaign brief close
-                    while the job moves through the queue.
+                    Review the active asset, copy the AI-generated caption, and access your original brief below.
                   </p>
-                </div>
-
-                <div className="chip-switch">
-                  <button
-                    type="button"
-                    className={`chip-switch__item${workspaceFocus === 'preview' ? ' is-active' : ''}`}
-                    onClick={() => selectWorkspaceFocus('preview')}
-                  >
-                    PREVIEW
-                  </button>
-                  <button
-                    type="button"
-                    className={`chip-switch__item${workspaceFocus === 'brief' ? ' is-active' : ''}`}
-                    onClick={() => selectWorkspaceFocus('brief')}
-                  >
-                    BRIEF
-                  </button>
                 </div>
               </div>
 
-              <div className="feature-section__body feature-section__body--workspace">
-                <article className={`panel panel--workspace ${workspaceFocus === 'preview' ? 'is-emphasis' : ''}`}>
-                  <div className="panel-kicker">LIVE PREVIEW</div>
-                  <div className="player">
-                    <div className="player__topline">
-                      <div className="player__label">
-                        <Sparkles size={14} strokeWidth={2.4} />
-                        <span>
-                          {creatorMode === 'video' 
-                            ? (activeJob?.title || 'VIDEO REEL')
-                            : (selectedPhotoAd?.title || 'PHOTO STUDIO')
-                          }
-                        </span>
-                      </div>
-                      <div className="player__badge">
-                        {creatorMode === 'video' 
-                          ? (activeJob ? formatDate(activeJob.createdAt) : 'NO JOB')
-                          : (selectedPhotoAd ? formatDate(selectedPhotoAd.createdAt) : 'NO SET')
-                        }
-                      </div>
-                    </div>
-
-                    <div className="player__body">
-                      <div className="player__title">
-                        {(() => {
-                          if (creatorMode === 'photo') {
-                            if (!selectedPhotoAd) return 'Select a photo set from history';
-                            return <div className="post-preview">{selectedPhotoAd.prompt}</div>;
-                          }
-                          if (!activeJob) return 'No job selected yet';
-                          if (activeJob.kind === 'video') {
-                            const vJob = activeJob as VideoJob;
-                            if (vJob.caption) {
-                              return <div className="post-preview">{vJob.caption}</div>;
-                            }
-                            if (vJob.script) {
+              <div className="feature-section__body feature-section__body--workspace-unified">
+                <div className="workspace-main-column">
+                  <article className="panel panel--workspace-large">
+                    <div className="panel-kicker">LIVE PREVIEW</div>
+                    
+                    <div className="player player--large">
+                      {/* Caption Top Block */}
+                      <div className="player__caption-box">
+                        <div className="player__caption-header">
+                          <div className="player__label">
+                            <Sparkles size={14} strokeWidth={2.4} />
+                            <span>AI CAPTION</span>
+                          </div>
+                          <button type="button" className="mini-button mini-button--ghost" onClick={handleCopyCaption}>
+                            {copied ? <Check size={14} /> : <Copy size={14} />}
+                            {copied ? 'COPIED' : 'COPY'}
+                          </button>
+                        </div>
+                        <div className="player__caption-content">
+                          {(() => {
+                            if (creatorMode === 'photo') {
+                              if (!selectedPhotoAd) return 'Select a photo set from history';
                               return (
-                                <div className="post-preview">
-                                  <div className="post-preview__body">
-                                    {vJob.script.hook || vJob.script.title || vJob.description} {vJob.script.cta}
-                                  </div>
-                                  <div className="post-preview__tags">
-                                    {(vJob.script.hashtags || []).map((tag) => (
-                                      <span key={tag}>#{tag.replace(/^#/, '')}</span>
+                                <>
+                                  <p>{selectedPhotoAd.prompt}</p>
+                                  <div className="photo-caption-tags">
+                                    {(selectedPhotoAd.title || '').split(' ').filter(Boolean).slice(0, 4).map((w: string, i: number) => (
+                                      <span key={i} className="photo-caption-tag">#{w.toLowerCase().replace(/[^a-z0-9]/g, '')}</span>
                                     ))}
+                                    {selectedPhotoAd.style && <span className="photo-caption-tag">#{selectedPhotoAd.style}</span>}
+                                    <span className="photo-caption-tag">#aimarketing</span>
                                   </div>
-                                </div>
+                                </>
                               );
                             }
-                          } else {
-                            const pJob = activeJob as PhotoJob;
-                            if (pJob.caption) {
-                              return <div className="post-preview">{pJob.caption}</div>;
+                            if (!activeJob) return 'No job selected yet';
+                            if (activeJob.kind === 'video') {
+                              const vJob = activeJob as VideoJob;
+                              if (vJob.caption) {
+                                return (
+                                  <>
+                                    <p>{vJob.caption}</p>
+                                    {vJob.script?.hashtags && vJob.script.hashtags.length > 0 && (
+                                      <div className="photo-caption-tags">
+                                        {vJob.script.hashtags.map((tag) => (
+                                          <span key={tag} className="photo-caption-tag">#{tag.replace(/^#/, '')}</span>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </>
+                                );
+                              }
+                              if (vJob.script) {
+                                return (
+                                  <>
+                                    <p>{vJob.script.hook || vJob.script.title || vJob.description} {vJob.script.cta}</p>
+                                    <div className="photo-caption-tags">
+                                      {(vJob.script.hashtags || []).map((tag) => (
+                                        <span key={tag} className="photo-caption-tag">#{tag.replace(/^#/, '')}</span>
+                                      ))}
+                                    </div>
+                                  </>
+                                );
+                              }
+                            } else {
+                              const pJob = activeJob as PhotoJob;
+                              if (pJob.caption) {
+                                return <p>{pJob.caption}</p>;
+                              }
                             }
+                            return <p>{activeJob.description}</p>;
+                          })()}
+                        </div>
+                      </div>
+
+                      <div className="player__topline" style={{ marginTop: '1rem' }}>
+                        <div className="player__label">
+                          <Sparkles size={14} strokeWidth={2.4} />
+                          <span>
+                            {creatorMode === 'video' 
+                              ? (activeJob?.title || 'VIDEO REEL')
+                              : (selectedPhotoAd?.title || 'PHOTO STUDIO')
+                            }
+                          </span>
+                        </div>
+                        <div className="player__badge">
+                          {creatorMode === 'video' 
+                            ? (activeJob ? formatDate(activeJob.createdAt) : 'NO JOB')
+                            : (selectedPhotoAd ? formatDate(selectedPhotoAd.createdAt) : 'NO SET')
                           }
-                          return activeJob.description;
-                        })()}
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="player__timing">
-                      <div className="player__timing-head">
-                        <span>PROGRESS</span>
-                        <span>{Math.min(100, Math.max(0, activeProgress || 0)).toFixed(0)}%</span>
-                      </div>
-                      <div className="player__bar">
-                        <div
-                          className="player__knob"
-                          style={{ left: `${Math.min(100, Math.max(0, activeProgress || 0))}%` }}
-                        />
-                      </div>
-                    </div>
+                      {(activeJob?.status === 'processing' || activeJob?.status === 'queued' || activeProgress < 100) && activeJob?.status !== 'completed' && (
+                        <div className="player__timing" style={{ marginTop: '1rem', padding: '16px', background: 'rgba(99, 102, 241, 0.05)', borderRadius: '12px', border: '1px solid rgba(99, 102, 241, 0.15)' }}>
+                          <div className="player__timing-head" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.75rem', fontWeight: 800, letterSpacing: '1px', color: '#6366f1' }}>
+                            <span>GENERATING...</span>
+                            <span>{Math.min(100, Math.max(0, activeProgress || 0)).toFixed(0)}%</span>
+                          </div>
+                          <div className="player__bar" style={{ height: '6px', background: 'rgba(99, 102, 241, 0.1)', borderRadius: '4px', overflow: 'hidden', position: 'relative' }}>
+                            <div
+                              className="player__knob"
+                              style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: `${Math.min(100, Math.max(0, activeProgress || 0))}%`, background: '#6366f1', transition: 'width 0.3s ease' }}
+                            />
+                          </div>
+                        </div>
+                      )}
 
-                    <div className={`player__preview${creatorMode === 'photo' ? ' player__preview--photo' : ''}`}>
-                      <div className={`player__preview-surface${creatorMode === 'photo' ? ' player__preview-surface--photo' : ''}`}>
-                        {creatorMode === 'photo' ? (
-                          selectedPhotoAd ? (
-                            <div className="photo-studio-preview">
-                              {/* 3 Photos Horizontal with Save/Download buttons */}
-                              <div className="photo-concepts-grid">
-                                {selectedPhotoAd.images.map((image: any, index: number) => (
-                                  <div key={index} className="photo-concept-card">
-                                    <div className="photo-concept-label">Concept {index + 1}</div>
-                                    <img
-                                      src={image.url}
-                                      alt={`Concept ${index + 1}`}
-                                      className="photo-concept-img"
-                                    />
-                                    <a
-                                      href={image.url}
-                                      download={`${(selectedPhotoAd.title || 'photo').replace(/\s+/g, '-')}-concept-${index + 1}.jpg`}
-                                      className="photo-concept-save"
-                                      onClick={async (e) => {
-                                        e.preventDefault();
-                                        try {
-                                          const res = await fetch(image.url);
-                                          const blob = await res.blob();
-                                          const url = URL.createObjectURL(blob);
-                                          const a = document.createElement('a');
-                                          a.href = url;
-                                          a.download = `${(selectedPhotoAd.title || 'photo').replace(/\s+/g, '-')}-concept-${index + 1}.jpg`;
-                                          a.click();
-                                          URL.revokeObjectURL(url);
-                                        } catch {
-                                          window.open(image.url, '_blank');
-                                        }
-                                      }}
-                                    >
-                                      ⬇ SAVE PHOTO
-                                    </a>
-                                  </div>
-                                ))}
-                              </div>
-
-                              {/* Social Caption + Hashtags — below photos */}
-                              <div className="photo-caption-block">
-                                <p className="photo-caption-text">{selectedPhotoAd.prompt}</p>
-                                <div className="photo-caption-tags">
-                                  {(selectedPhotoAd.title || '').split(' ').filter(Boolean).slice(0, 4).map((w: string, i: number) => (
-                                    <span key={i} className="photo-caption-tag">#{w.toLowerCase().replace(/[^a-z0-9]/g, '')}</span>
+                      <div className={`player__preview player__preview--large${creatorMode === 'photo' ? ' player__preview--photo' : ''}`}>
+                        <div className={`player__preview-surface${creatorMode === 'photo' ? ' player__preview-surface--photo' : ''}`}>
+                          {creatorMode === 'photo' ? (
+                            selectedPhotoAd ? (
+                              <div className="photo-studio-preview">
+                                <div className="photo-concepts-grid">
+                                  {selectedPhotoAd.images.map((image: any, index: number) => (
+                                    <div key={index} className="photo-concept-card">
+                                      <div className="photo-concept-label">Concept {index + 1}</div>
+                                      <img
+                                        src={image.url}
+                                        alt={`Concept ${index + 1}`}
+                                        className="photo-concept-img"
+                                      />
+                                      <a
+                                        href={image.url}
+                                        download={`${(selectedPhotoAd.title || 'photo').replace(/\s+/g, '-')}-concept-${index + 1}.jpg`}
+                                        className="photo-concept-save"
+                                        onClick={async (e) => {
+                                          e.preventDefault();
+                                          try {
+                                            const res = await fetch(image.url);
+                                            const blob = await res.blob();
+                                            const url = URL.createObjectURL(blob);
+                                            const a = document.createElement('a');
+                                            a.href = url;
+                                            a.download = `${(selectedPhotoAd.title || 'photo').replace(/\s+/g, '-')}-concept-${index + 1}.jpg`;
+                                            a.click();
+                                            URL.revokeObjectURL(url);
+                                          } catch {
+                                            window.open(image.url, '_blank');
+                                          }
+                                        }}
+                                      >
+                                        ⬇ SAVE PHOTO
+                                      </a>
+                                    </div>
                                   ))}
-                                  {selectedPhotoAd.style && <span className="photo-caption-tag">#{selectedPhotoAd.style}</span>}
-                                  {selectedPhotoAd.productCategory && <span className="photo-caption-tag">#{selectedPhotoAd.productCategory.replace(/-/g, '')}</span>}
-                                  <span className="photo-caption-tag">#aimarketing</span>
-                                  <span className="photo-caption-tag">#brand</span>
-                                  <span className="photo-caption-tag">#contentcreator</span>
                                 </div>
                               </div>
-                            </div>
+                            ) : (
+                              <div className="player__empty-state">
+                                <span>No photo set selected</span>
+                                <small>Generate a set or pick one from history</small>
+                              </div>
+                            )
+                          ) : activeOutputUrl ? (
+                            activeJob?.kind === 'photo' ? (
+                              <img
+                                className="player__asset"
+                                src={activeOutputUrl}
+                                alt={activeJob.description || 'Campaign output'}
+                              />
+                            ) : (
+                              <video
+                                id="main-video-player"
+                                key={activeOutputUrl}
+                                className="player__asset"
+                                controls
+                                playsInline
+                                loop
+                                autoPlay
+                                preload="auto"
+                                crossOrigin="anonymous"
+                                onLoadedData={(e) => {
+                                  e.currentTarget.play().catch(() => {});
+                                }}
+                              >
+                                <source src={activeOutputUrl.replace('localhost', '127.0.0.1')} type="video/mp4" />
+                                <source src={activeOutputUrl} type="video/mp4" />
+                                Your browser does not support the video tag.
+                              </video>
+                            )
                           ) : (
                             <div className="player__empty-state">
-                              <span>No photo set selected</span>
-                              <small>Generate a set or pick one from history</small>
-                            </div>
-                          )
-                        ) : activeOutputUrl ? (
-                          activeJob?.kind === 'photo' ? (
-                            <img
-                              className="player__asset"
-                              src={activeOutputUrl}
-                              alt={activeJob.description || 'Campaign output'}
-                            />
-                          ) : (
-                            <video
-                              id="main-video-player"
-                              key={activeOutputUrl}
-                              className="player__asset"
-                              controls
-                              playsInline
-                              loop
-                              autoPlay
-                              preload="auto"
-                              crossOrigin="anonymous"
-                              onLoadedData={(e) => {
-                                e.currentTarget.play().catch(() => {});
-                              }}
-                            >
-                              <source src={activeOutputUrl.replace('localhost', '127.0.0.1')} type="video/mp4" />
-                              <source src={activeOutputUrl} type="video/mp4" />
-                              Your browser does not support the video tag.
-                            </video>
-                          )
-                        ) : (
-                          <div className="player__empty-state">
-                            {puterStatus ? (
-                              <div className="puter-loader">
-                                <Sparkles className="puter-loader__icon" size={32} />
-                                <span>{puterStatus}</span>
-                                <small>Please wait, AI is painting your vision...</small>
-                              </div>
-                            ) : (
-                              <>
-                                <span>No preview yet</span>
-                                <small>Select a job or queue a new campaign</small>
-                              </>
-                            )}
-                          </div>
-                        )}
-                      </div>
-
-                      {activeJob?.kind === 'video' && (activeJob as VideoJob).caption && (
-                        <div className="photo-caption-block" style={{ marginTop: '20px' }}>
-                          <p className="photo-caption-text">{(activeJob as VideoJob).caption}</p>
-                          {(activeJob as VideoJob).script?.hashtags && (activeJob as VideoJob).script!.hashtags!.length > 0 && (
-                            <div className="photo-caption-tags">
-                              {(activeJob as VideoJob).script!.hashtags!.map(tag => (
-                                <span key={tag} className="photo-caption-tag">
-                                  {tag.startsWith('#') ? tag : `#${tag}`}
-                                </span>
-                              ))}
+                              {puterStatus ? (
+                                <div className="puter-loader">
+                                  <Sparkles className="puter-loader__icon" size={32} />
+                                  <span>{puterStatus}</span>
+                                  <small>Please wait, AI is painting your vision...</small>
+                                </div>
+                              ) : (
+                                <>
+                                  <span>No preview yet</span>
+                                  <small>Select a job or queue a new campaign</small>
+                                </>
+                              )}
                             </div>
                           )}
                         </div>
-                      )}
-                    </div>
+                      </div>
 
-                    <div className="player__actions" style={creatorMode === 'photo' ? { display: 'none' } : {}}>
-                      <button
-                        type="button"
-                        className="player-button player-button--solid"
-                        onClick={openOutput}
-                        disabled={!activeOutputUrl}
-                      >
-                        {activeOutputUrl ? 'OPEN ASSET' : 'NO OUTPUT'}
-                      </button>
-                    </div>
-                  </div>
-                </article>
+                      <div className="player__actions player__actions--split" style={creatorMode === 'photo' ? { display: 'none' } : {}}>
+                        <button
+                          type="button"
+                          className="player-button player-button--ghost"
+                          onClick={handleDownloadAsset}
+                          disabled={!activeOutputUrl}
+                        >
+                          <Download size={16} />
+                          DOWNLOAD ASSET
+                        </button>
+                        <button
+                          type="button"
+                          className="player-button player-button--solid"
+                          onClick={openOutput}
+                          disabled={!activeOutputUrl}
+                        >
+                          {activeOutputUrl ? 'OPEN ASSET' : 'NO OUTPUT'}
+                        </button>
+                      </div>
 
-                <div className="feature-stack">
-                  <article className={`panel panel--brief ${workspaceFocus === 'brief' ? 'is-emphasis' : ''}`}>
+                      {/* Mock Social Publish Section */}
+                      <div className="social-simulator-actions" style={{ marginTop: '1.2rem', padding: '16px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.08)' }}>
+                        <div style={{ fontSize: '0.72rem', fontWeight: 900, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-quiet)', marginBottom: '10px', textAlign: 'center' }}>
+                          CREATE SIMULATED POST (PREVIEW & POST)
+                        </div>
+                        <div className="social-sim-buttons-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+                          <button
+                            type="button"
+                            className="social-sim-btn social-sim-btn--fb"
+                            onClick={() => setActiveSocialModal('facebook')}
+                            disabled={!activeOutputUrl && !selectedPhotoAd}
+                          >
+                            <span style={{ fontSize: '1.1rem', marginRight: '6px' }}>📘</span> FACEBOOK
+                          </button>
+                          <button
+                            type="button"
+                            className="social-sim-btn social-sim-btn--ig"
+                            onClick={() => setActiveSocialModal('instagram')}
+                            disabled={!activeOutputUrl && !selectedPhotoAd}
+                          >
+                            <span style={{ fontSize: '1.1rem', marginRight: '6px' }}>📸</span> INSTAGRAM
+                          </button>
+                          <button
+                            type="button"
+                            className="social-sim-btn social-sim-btn--tt"
+                            onClick={() => setActiveSocialModal('tiktok')}
+                            disabled={!activeOutputUrl && !selectedPhotoAd}
+                          >
+                            <span style={{ fontSize: '1.1rem', marginRight: '6px' }}>🎵</span> TIKTOK
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </article>
+
+                  <article className="panel panel--brief-integrated">
                     <div className="brief-head">
                       <div className="panel-kicker">CAMPAIGN BRIEF</div>
                       <div className="brief-count">{activeJob?.description?.length || 0}/800</div>
                     </div>
-                    <div className="brief-editor">
-                      <div className="brief-editor__content">
-                        {briefTab === 'audience' && (
-                          <>
-                            <div className="brief-editor__line brief-editor__line--main" style={{ color: '#8b5cf6' }}>TARGET AUDIENCE</div>
-                            <div className="brief-editor__line">
-                              {activeJob?.audience 
-                                ? activeJob.audience 
-                                : activeJob 
-                                  ? `Primary target: High-intent consumers interested in ${activeJob.style || 'modern'} ${activeJob.productCategory || 'products'}.`
-                                  : 'Define who this campaign is for (e.g., "Luxury watch enthusiasts aged 25-45").'}
-                            </div>
-                          </>
-                        )}
-                        {briefTab === 'offer' && (
-                          <>
-                            <div className="brief-editor__line brief-editor__line--main" style={{ color: '#6366f1' }}>THE OFFER</div>
-                            <div className="brief-editor__line">
-                              {activeJob?.offer 
-                                ? activeJob.offer 
-                                : activeJob 
-                                  ? `The core promise: High-end ${activeJob.title || 'product'} visual storytelling with ${activeJob.style} aesthetics.`
-                                  : 'What are you selling? (e.g., "Limited edition ceramic timepiece with free shipping").'}
-                            </div>
-                          </>
-                        )}
-                        {briefTab === 'proof' && (
-                          <>
-                            <div className="brief-editor__line brief-editor__line--main" style={{ color: '#ec4899' }}>PROOF & VALUE</div>
-                            <div className="brief-editor__line">
-                              {activeJob?.proof 
-                                ? activeJob.proof 
-                                : activeJob 
-                                  ? `Value Proposition: Professional grade AI-rendered assets optimized for social conversion.`
-                                  : 'Why should they trust you? (e.g., "Swiss-made movement, scratch-resistant sapphire").'}
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="brief-chips">
-                      <button 
-                        type="button"
-                        className={`brief-chip ${briefTab === 'audience' ? 'is-active' : ''}`}
-                        onClick={() => setBriefTab('audience')}
-                      >
-                        AUDIENCE
-                      </button>
-                      <button 
-                        type="button"
-                        className={`brief-chip ${briefTab === 'offer' ? 'is-active' : ''}`}
-                        onClick={() => setBriefTab('offer')}
-                      >
-                        OFFER
-                      </button>
-                      <button 
-                        type="button"
-                        className={`brief-chip ${briefTab === 'proof' ? 'is-active' : ''}`}
-                        onClick={() => setBriefTab('proof')}
-                      >
-                        PROOF
-                      </button>
-                    </div>
-                  </article>
-
-                  <article className="panel panel--metrics">
-                    <div className="panel-kicker">WORKSPACE SNAPSHOT</div>
-                    <div className="metrics-grid">
-                      <div className="metric">
-                        <div className="metric__number">{isLoadingJobs ? '...' : videoCount}</div>
-                        <div className="metric__copy">
-                          <div className="metric__label">Videos</div>
-                          <div className="metric__sub">current backend jobs</div>
+                    <div className="brief-integrated-grid">
+                      <div className="brief-integrated-col">
+                        <div className="brief-editor__line brief-editor__line--main" style={{ color: '#8b5cf6', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem' }}>
+                          <Users size={16} /> TARGET AUDIENCE
+                        </div>
+                        <div className="brief-editor__line" style={{ marginTop: '12px' }}>
+                          {activeJob?.audience 
+                            ? activeJob.audience 
+                            : activeJob 
+                              ? `Primary target: High-intent consumers interested in ${activeJob.style || 'modern'} ${activeJob.productCategory || 'products'}.`
+                              : 'Define who this campaign is for.'}
                         </div>
                       </div>
-                      <div className="metric metric--split">
-                        <div className="metric__number">{isLoadingJobs ? '...' : photoCount}</div>
-                        <div className="metric__copy">
-                          <div className="metric__label">Photos</div>
-                          <div className="metric__sub">rendered still campaigns</div>
+                      <div className="brief-integrated-col">
+                        <div className="brief-editor__line brief-editor__line--main" style={{ color: '#6366f1', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem' }}>
+                          <Tag size={16} /> THE OFFER
+                        </div>
+                        <div className="brief-editor__line" style={{ marginTop: '12px' }}>
+                          {activeJob?.offer 
+                            ? activeJob.offer 
+                            : activeJob 
+                              ? `The core promise: High-end ${activeJob.title || 'product'} visual storytelling with ${activeJob.style} aesthetics.`
+                              : 'What are you selling?'}
+                        </div>
+                      </div>
+                      <div className="brief-integrated-col">
+                        <div className="brief-editor__line brief-editor__line--main" style={{ color: '#ec4899', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem' }}>
+                          <ShieldCheck size={16} /> PROOF & VALUE
+                        </div>
+                        <div className="brief-editor__line" style={{ marginTop: '12px' }}>
+                          {activeJob?.proof 
+                            ? activeJob.proof 
+                            : activeJob 
+                              ? `Value Proposition: Professional grade AI-rendered assets optimized for social conversion.`
+                              : 'Why should they trust you?'}
                         </div>
                       </div>
                     </div>
@@ -1313,53 +1477,147 @@ function DashboardPage() {
               <div className="panel panel--history">
                 {historyMode === 'video' ? (
                   selectedHistory.length > 0 ? (
-                    <div className="history-grid">
-                      {selectedHistory.map((job) => (
-                        <button
-                          key={job._id}
-                          type="button"
-                          className={`history-card${selectedJobId === job._id ? ' is-active' : ''}`}
-                          onClick={() => handleHistoryCardClick(job)}
-                        >
-                          <div className="history-card__top">
-                            <span className="history-card__title">{job.title || job.description || 'Untitled job'}</span>
-                            <span className="history-card__date">{formatDate(job.createdAt)}</span>
+                    <>
+                      <div className="history-grid">
+                        {selectedHistory.map((job) => (
+                          <div key={job._id} style={{ position: 'relative' }}>
+                            <button
+                              type="button"
+                              className={`history-card${selectedJobId === job._id ? ' is-active' : ''}`}
+                              onClick={() => handleHistoryCardClick(job)}
+                              style={{ width: '100%' }}
+                            >
+                              <div className="history-card__top">
+                                <span className="history-card__title">{job.title || job.description || 'Untitled job'}</span>
+                                <span className="history-card__date">{formatDate(job.createdAt)}</span>
+                              </div>
+                              <div className="history-card__meta">
+                                <span className={`history-pill history-pill--${getStatusTone(job.status)}`}>
+                                  {getStatusLabel(job.status)}
+                                </span>
+                                <span className="history-card__note">{job.message || 'Backend job item.'}</span>
+                              </div>
+                            </button>
+                            <button
+                              className="history-delete-btn"
+                              onClick={(e) => handleDeleteJob(job._id, 'job', e)}
+                              title="Delete job"
+                              style={{
+                                position: 'absolute',
+                                bottom: '12px',
+                                right: '12px',
+                                background: 'transparent',
+                                border: 'none',
+                                color: 'var(--text-quiet)',
+                                cursor: 'pointer',
+                                padding: '4px',
+                                borderRadius: '4px'
+                              }}
+                              onMouseEnter={(e) => e.currentTarget.style.color = '#ef4444'}
+                              onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-quiet)'}
+                            >
+                              <Trash2 size={14} />
+                            </button>
                           </div>
-                          <div className="history-card__meta">
-                            <span className={`history-pill history-pill--${getStatusTone(job.status)}`}>
-                              {getStatusLabel(job.status)}
-                            </span>
-                            <span className="history-card__note">{job.message || 'Backend job item.'}</span>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
+                      {totalHistoryPages > 1 && (
+                        <div className="pagination-controls" style={{ display: 'flex', justifyContent: 'center', gap: '16px', marginTop: '24px' }}>
+                          <button
+                            type="button"
+                            onClick={() => setHistoryPage(p => Math.max(1, p - 1))}
+                            disabled={historyPage === 1}
+                            style={{ padding: '6px 12px', borderRadius: '6px', background: 'var(--bg-elevated)', color: historyPage === 1 ? 'var(--text-quiet)' : 'var(--text-main)', border: '1px solid var(--border)', cursor: historyPage === 1 ? 'not-allowed' : 'pointer' }}
+                          >
+                            Prev
+                          </button>
+                          <span style={{ display: 'flex', alignItems: 'center', fontSize: '0.85rem', color: 'var(--text-quiet)' }}>
+                            Page {historyPage} of {totalHistoryPages}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setHistoryPage(p => Math.min(totalHistoryPages, p + 1))}
+                            disabled={historyPage === totalHistoryPages}
+                            style={{ padding: '6px 12px', borderRadius: '6px', background: 'var(--bg-elevated)', color: historyPage === totalHistoryPages ? 'var(--text-quiet)' : 'var(--text-main)', border: '1px solid var(--border)', cursor: historyPage === totalHistoryPages ? 'not-allowed' : 'pointer' }}
+                          >
+                            Next
+                          </button>
+                        </div>
+                      )}
+                    </>
                   ) : (
                     <div className="history-empty">
                       {isLoadingJobs ? 'Loading backend jobs...' : 'No video jobs found.'}
                     </div>
                   )
                 ) : (
-                  photoAds.length > 0 ? (
-                    <div className="history-grid">
-                      {photoAds.map((ad) => (
-                        <button
-                          key={ad._id}
-                          type="button"
-                          className={`history-card${selectedPhotoAdId === ad._id ? ' is-active' : ''}`}
-                          onClick={() => handlePhotoCardClick(ad)}
-                        >
-                          <div className="history-card__top">
-                            <span className="history-card__title">{ad.title || 'Untitled photo set'}</span>
-                            <span className="history-card__date">{formatDate(ad.createdAt)}</span>
+                  selectedPhotoAds.length > 0 ? (
+                    <>
+                      <div className="history-grid">
+                        {selectedPhotoAds.map((ad) => (
+                          <div key={ad._id} style={{ position: 'relative' }}>
+                            <button
+                              type="button"
+                              className={`history-card${selectedPhotoAdId === ad._id ? ' is-active' : ''}`}
+                              onClick={() => handlePhotoCardClick(ad)}
+                              style={{ width: '100%' }}
+                            >
+                              <div className="history-card__top">
+                                <span className="history-card__title">{ad.title || 'Untitled photo set'}</span>
+                                <span className="history-card__date">{formatDate(ad.createdAt)}</span>
+                              </div>
+                              <div className="history-card__meta">
+                                <span className="history-pill history-pill--ready">READY</span>
+                                <span className="history-card__note">{ad.images.length} concepts · {ad.aspectRatio}</span>
+                              </div>
+                            </button>
+                            <button
+                              className="history-delete-btn"
+                              onClick={(e) => handleDeleteJob(ad._id, 'ad', e)}
+                              title="Delete photo set"
+                              style={{
+                                position: 'absolute',
+                                bottom: '12px',
+                                right: '12px',
+                                background: 'transparent',
+                                border: 'none',
+                                color: 'var(--text-quiet)',
+                                cursor: 'pointer',
+                                padding: '4px',
+                                borderRadius: '4px'
+                              }}
+                              onMouseEnter={(e) => e.currentTarget.style.color = '#ef4444'}
+                              onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-quiet)'}
+                            >
+                              <Trash2 size={14} />
+                            </button>
                           </div>
-                          <div className="history-card__meta">
-                            <span className="history-pill history-pill--ready">READY</span>
-                            <span className="history-card__note">{ad.images.length} concepts · {ad.aspectRatio}</span>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
+                      {totalPhotoHistoryPages > 1 && (
+                        <div className="pagination-controls" style={{ display: 'flex', justifyContent: 'center', gap: '16px', marginTop: '24px' }}>
+                          <button
+                            type="button"
+                            onClick={() => setHistoryPage(p => Math.max(1, p - 1))}
+                            disabled={historyPage === 1}
+                            style={{ padding: '6px 12px', borderRadius: '6px', background: 'var(--bg-elevated)', color: historyPage === 1 ? 'var(--text-quiet)' : 'var(--text-main)', border: '1px solid var(--border)', cursor: historyPage === 1 ? 'not-allowed' : 'pointer' }}
+                          >
+                            Prev
+                          </button>
+                          <span style={{ display: 'flex', alignItems: 'center', fontSize: '0.85rem', color: 'var(--text-quiet)' }}>
+                            Page {historyPage} of {totalPhotoHistoryPages}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setHistoryPage(p => Math.min(totalPhotoHistoryPages, p + 1))}
+                            disabled={historyPage === totalPhotoHistoryPages}
+                            style={{ padding: '6px 12px', borderRadius: '6px', background: 'var(--bg-elevated)', color: historyPage === totalPhotoHistoryPages ? 'var(--text-quiet)' : 'var(--text-main)', border: '1px solid var(--border)', cursor: historyPage === totalPhotoHistoryPages ? 'not-allowed' : 'pointer' }}
+                          >
+                            Next
+                          </button>
+                        </div>
+                      )}
+                    </>
                   ) : (
                     <div className="history-empty">
                       No photo sets found. Generate one in the Create section.
@@ -1376,6 +1634,201 @@ function DashboardPage() {
           </div>
         </div>
       </main>
+
+      {activeSocialModal && (
+        <div className="social-modal-overlay" onClick={() => setActiveSocialModal(null)}>
+          <div className="social-modal-container" onClick={(e) => e.stopPropagation()}>
+            
+            {activeSocialModal === 'facebook' && (
+              <div className="fb-post-modal">
+                <div className="fb-post-modal__header">
+                  <h3>Create post</h3>
+                  <button className="fb-post-modal__close" onClick={() => setActiveSocialModal(null)}><X size={20} /></button>
+                </div>
+                
+                <div className="fb-post-modal__body">
+                  <div className="fb-post-modal__user-row">
+                    <div className="fb-post-modal__avatar">{userInitials}</div>
+                    <div className="fb-post-modal__user-info">
+                      <div className="fb-post-modal__name">{userDisplayName}</div>
+                      <div className="fb-post-modal__privacy">
+                        <Users size={12} />
+                        <span>Friends</span>
+                        <ChevronDown size={12} />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="fb-post-modal__text-area" contentEditable suppressContentEditableWarning>
+                    {(() => {
+                      if (creatorMode === 'photo' && selectedPhotoAd) return selectedPhotoAd.prompt;
+                      if (activeJob?.kind === 'video') {
+                        const vJob = activeJob as VideoJob;
+                        return vJob.caption || (vJob.script ? `${vJob.script.hook || vJob.script.title || vJob.description} ${vJob.script.cta}` : activeJob.description);
+                      }
+                      return activeJob?.description;
+                    })()}
+                  </div>
+
+                  <div className="fb-post-modal__media-container">
+                    <button className="fb-post-modal__edit-btn">✏️ Edit</button>
+                    <button className="fb-post-modal__remove-btn" onClick={() => setActiveSocialModal(null)}><X size={16} /></button>
+                    
+                    {creatorMode === 'photo' && selectedPhotoAd ? (
+                      <img src={selectedPhotoAd.images[0]?.url} alt="Fb Post Preview" />
+                    ) : activeOutputUrl ? (
+                      <video src={activeOutputUrl} controls autoPlay muted loop />
+                    ) : null}
+                  </div>
+
+                  <div className="fb-post-modal__add-to-post">
+                    <span>Add to your post</span>
+                    <div className="fb-post-modal__add-icons">
+                      <span className="fb-icon-btn img-icon">🖼️</span>
+                      <span className="fb-icon-btn tag-icon">👥</span>
+                      <span className="fb-icon-btn emoji-icon">😀</span>
+                      <span className="fb-icon-btn location-icon">📍</span>
+                      <span className="fb-icon-btn gif-icon">GIF</span>
+                      <span className="fb-icon-btn more-icon">•••</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="fb-post-modal__footer">
+                  <button className="fb-post-modal__submit-btn" onClick={() => {
+                    setCustomAlert({
+                      title: 'Simulation Mode',
+                      message: 'This is a mock preview! To post on real platforms, download the asset and copy the caption.'
+                    });
+                    setActiveSocialModal(null);
+                  }}>Post</button>
+                </div>
+              </div>
+            )}
+
+            {activeSocialModal === 'instagram' && (
+              <div className="ig-post-modal">
+                <div className="ig-post-modal__header">
+                  <button className="ig-post-modal__cancel" onClick={() => setActiveSocialModal(null)}>Cancel</button>
+                  <h3>Create new post</h3>
+                  <button className="ig-post-modal__share-top" onClick={() => {
+                    setCustomAlert({
+                      title: 'Simulation Mode',
+                      message: 'This is a mock preview! To post on real platforms, download the asset and copy the caption.'
+                    });
+                    setActiveSocialModal(null);
+                  }}>Share</button>
+                </div>
+                
+                <div className="ig-post-modal__body">
+                  <div className="ig-post-modal__media">
+                    {creatorMode === 'photo' && selectedPhotoAd ? (
+                      <img src={selectedPhotoAd.images[0]?.url} alt="Ig Post Preview" />
+                    ) : activeOutputUrl ? (
+                      <video src={activeOutputUrl} controls autoPlay muted loop />
+                    ) : null}
+                  </div>
+                  
+                  <div className="ig-post-modal__details">
+                    <div className="ig-post-modal__user">
+                      <div className="ig-post-modal__avatar">{userInitials}</div>
+                      <span className="ig-post-modal__username">{userLabel.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()}</span>
+                    </div>
+                    
+                    <textarea 
+                      className="ig-post-modal__caption-input" 
+                      placeholder="Write a caption..."
+                      defaultValue={(() => {
+                        if (creatorMode === 'photo' && selectedPhotoAd) return selectedPhotoAd.prompt;
+                        if (activeJob?.kind === 'video') {
+                          const vJob = activeJob as VideoJob;
+                          return vJob.caption || (vJob.script ? `${vJob.script.hook || vJob.script.title || vJob.description} ${vJob.script.cta}` : activeJob.description);
+                        }
+                        return activeJob?.description;
+                      })()}
+                    />
+                    
+                    <div className="ig-post-modal__menu-list">
+                      <div className="ig-post-modal__menu-item">Add Location <span>📍</span></div>
+                      <div className="ig-post-modal__menu-item">Tag People <span>👤</span></div>
+                      <div className="ig-post-modal__menu-item">Advanced Settings <span>⚙️</span></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeSocialModal === 'tiktok' && (
+              <div className="tt-post-modal">
+                <div className="tt-post-modal__header">
+                  <h3>Post to TikTok</h3>
+                  <button className="tt-post-modal__close" onClick={() => setActiveSocialModal(null)}><X size={20} /></button>
+                </div>
+
+                <div className="tt-post-modal__body">
+                  <div className="tt-post-modal__left">
+                    <div className="tt-post-modal__phone-frame">
+                      {creatorMode === 'photo' && selectedPhotoAd ? (
+                        <img src={selectedPhotoAd.images[0]?.url} alt="TikTok Post Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      ) : activeOutputUrl ? (
+                        <video src={activeOutputUrl} controls autoPlay muted loop style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      ) : null}
+                    </div>
+                  </div>
+
+                  <div className="tt-post-modal__right">
+                    <div className="tt-post-modal__field">
+                      <label>Caption</label>
+                      <textarea 
+                        defaultValue={(() => {
+                          if (creatorMode === 'photo' && selectedPhotoAd) return selectedPhotoAd.prompt;
+                          if (activeJob?.kind === 'video') {
+                            const vJob = activeJob as VideoJob;
+                            return vJob.caption || (vJob.script ? `${vJob.script.hook || vJob.script.title || vJob.description} ${vJob.script.cta}` : activeJob.description);
+                          }
+                          return activeJob?.description;
+                        })()}
+                      />
+                      <div className="tt-post-modal__char-count">0 / 4000</div>
+                    </div>
+
+                    <div className="tt-post-modal__options">
+                      <div className="tt-post-modal__option-row">
+                        <span>Who can watch this video</span>
+                        <select>
+                          <option>Public</option>
+                          <option>Friends</option>
+                          <option>Private</option>
+                        </select>
+                      </div>
+                      <div className="tt-post-modal__option-row">
+                        <span>Allow users to:</span>
+                        <div className="tt-post-modal__checkboxes">
+                          <label><input type="checkbox" defaultChecked /> Comment</label>
+                          <label><input type="checkbox" defaultChecked /> Duet</label>
+                          <label><input type="checkbox" defaultChecked /> Stitch</label>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="tt-post-modal__actions">
+                      <button className="tt-btn tt-btn--discard" onClick={() => setActiveSocialModal(null)}>Discard</button>
+                      <button className="tt-btn tt-btn--post" onClick={() => {
+                        setCustomAlert({
+                          title: 'Simulation Mode',
+                          message: 'This is a mock preview! To post on real platforms, download the asset and copy the caption.'
+                        });
+                        setActiveSocialModal(null);
+                      }}>Post</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+          </div>
+        </div>
+      )}
 
       {isOutputViewerOpen && activeOutputUrl && (
         <div
@@ -1420,6 +1873,29 @@ function DashboardPage() {
             </div>
           </div>
         </div>
+      )}
+      {toastMessage && (
+        <div className="custom-toast">
+          <div className="custom-toast__icon">💡</div>
+          <div className="custom-toast__content">{toastMessage}</div>
+          <button className="custom-toast__close" onClick={() => setToastMessage(null)}>×</button>
+        </div>
+      )}
+      {customAlert && (
+        <div className="custom-alert-overlay" onClick={() => setCustomAlert(null)}>
+          <div className="custom-alert-container" onClick={(e) => e.stopPropagation()}>
+            <div className="custom-alert__icon">💡</div>
+            <h3>{customAlert.title}</h3>
+            <p>{customAlert.message}</p>
+            <button className="custom-alert__btn" onClick={() => setCustomAlert(null)}>OK</button>
+          </div>
+        </div>
+      )}
+      {isCreditStoreOpen && (
+        <CreditStoreModal
+          onClose={() => setIsCreditStoreOpen(false)}
+          onPurchaseInitiated={handlePurchaseInitiated}
+        />
       )}
     </div>
   );

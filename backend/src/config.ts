@@ -61,6 +61,8 @@ export const config = {
   workingDir: path.join(rootDir, 'storage/work'),
   cacheDir: path.join(rootDir, 'storage/cache'),
   outputDir: path.join(rootDir, 'storage/exports'),
+  stripeSecretKey: process.env.STRIPE_SECRET_KEY || '',
+  stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET || '',
 };
 
 export const requiredAtBoot = ['MONGODB_URI'] as const;

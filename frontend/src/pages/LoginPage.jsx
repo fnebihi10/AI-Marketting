@@ -10,7 +10,7 @@ import BrandLogo from '../components/common/BrandLogo';
 const LoginPage = () => {
   const navigate = useNavigate();
   const { login, isExpired, setIsExpired } = useAuth();
-  const { lang, toggleLanguage, t } = useLanguage();
+  const { t } = useLanguage();
   const { theme, toggleTheme } = useTheme();
 
   const [formData, setFormData] = useState({ email: '', password: '' });
@@ -49,15 +49,7 @@ const LoginPage = () => {
   return (
     <div className="auth-wrapper">
       <div className="auth-controls-row">
-        <button
-          className="auth-theme-toggle"
-          onClick={toggleLanguage}
-          title={lang === 'sq' ? 'Switch to English' : 'Kalo ne shqip'}
-        >
-          <span style={{ fontSize: '0.75rem', fontWeight: 800 }}>
-            {lang === 'sq' ? 'EN' : 'AL'}
-          </span>
-        </button>
+
         <button
           className="auth-theme-toggle"
           onClick={toggleTheme}

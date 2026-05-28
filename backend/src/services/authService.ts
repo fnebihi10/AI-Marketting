@@ -110,7 +110,7 @@ export const resetPassword = async (token: string, newPassword: string) => {
 
   const user = await User.findOne({
     resetPasswordToken: hashedToken,
-    resetPasswordExpires: { $gt: Date.now() },
+    resetPasswordExpires: { $gt: new Date() },
   });
 
   if (!user) {
