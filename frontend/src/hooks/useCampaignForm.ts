@@ -1,6 +1,7 @@
 import { useState, type ChangeEvent, type FormEvent } from 'react';
 import { createJob, createPhotoJob } from '../lib/api';
 import { CampaignKind } from './useJobs';
+import type { PhotoJob, VideoJob } from '../lib/api';
 
 export type FormState = {
   title: string;
@@ -12,7 +13,7 @@ export type FormState = {
 
 export const useCampaignForm = (
   createMode: CampaignKind,
-  onSuccess: (jobId: string) => void,
+  onSuccess: (job: VideoJob | PhotoJob) => void,
   onLoadJobs: () => Promise<void>
 ) => {
   const [form, setForm] = useState<FormState>({
@@ -61,7 +62,7 @@ export const useCampaignForm = (
           ? await createJob(payload)
           : await createPhotoJob(payload);
 
-      onSuccess(created._id);
+      onSuccess(created);
       await onLoadJobs();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create campaign.');

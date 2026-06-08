@@ -293,6 +293,7 @@ function DashboardPage() {
     isLoading: isLoadingJobs,
     error: loadError,
     loadJobs,
+    setJobs,
     removeJob
   } = useJobs(selectedJobId);
 
@@ -347,12 +348,31 @@ function DashboardPage() {
     handleSubmit: handleCreateSubmit
   } = useCampaignForm(
     createMode,
-    (jobId) => {
-      setSelectedJobId(jobId);
+    (createdJob) => {
+      setJobs((current) => {
+        if (createMode === 'video') {
+          return {
+            ...current,
+            videoJobs: current.videoJobs.some((job) => job._id === createdJob._id)
+              ? current.videoJobs
+              : [createdJob as VideoJob, ...current.videoJobs],
+          };
+        }
+
+        return {
+          ...current,
+          photoJobs: current.photoJobs.some((job) => job._id === createdJob._id)
+            ? current.photoJobs
+            : [createdJob as PhotoJob, ...current.photoJobs],
+        };
+      });
+      setSelectedJobId(createdJob._id);
       setHistoryMode(createMode);
+      setCreatorMode(createMode);
       setWorkspaceFocus('preview');
-      setActiveSection('history');
-      setExpandedSection('history');
+      setActiveWorkspaceTab('preview');
+      setActiveSection('workspace');
+      setExpandedSection('workspace');
       refreshUser();
     },
     loadJobs
@@ -413,7 +433,13 @@ function DashboardPage() {
 
     if (activeJob.kind === 'video') {
       const job = activeJob as VideoJob;
-      return job.output?.preview?.url || job.output?.video?.url || '';
+      return (
+        job.output?.preview?.url ||
+        job.output?.video?.url ||
+        (job as any).previewUrl ||
+        (job as any).videoUrl ||
+        ''
+      );
     }
 
     const job = activeJob as PhotoJob;

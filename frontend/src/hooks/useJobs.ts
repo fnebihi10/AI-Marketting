@@ -98,6 +98,10 @@ export const useJobs = (activeJobId: string | null) => {
           }
         });
     }
+
+    if (payload.status === 'completed') {
+      void loadJobs();
+    }
   });
 
   const removeJob = useCallback((jobId: string) => {
