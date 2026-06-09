@@ -16,7 +16,13 @@ const createApp = () => {
     const app = (0, express_1.default)();
     const frontendOrigin = normalizeOrigin(config_1.config.frontendUrl);
     app.use((0, cors_1.default)({
-        origin: frontendOrigin
+        origin: (origin, callback) => {
+            if (!origin || normalizeOrigin(origin) === frontendOrigin) {
+                callback(null, true);
+                return;
+            }
+            callback(new Error('Not allowed by CORS'));
+        }
     }));
     app.use('/api/billing/webhook', express_1.default.raw({ type: 'application/json' }));
     app.use(express_1.default.json({ limit: '10mb' }));
