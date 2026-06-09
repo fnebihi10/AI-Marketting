@@ -11,10 +11,12 @@ const config_1 = require("./config");
 const routes_1 = __importDefault(require("./routes"));
 const authRoutes_1 = __importDefault(require("./routes/authRoutes"));
 const billingRoutes_1 = __importDefault(require("./routes/billingRoutes"));
+const normalizeOrigin = (value) => value ? value.replace(/\/+$/, '') : value;
 const createApp = () => {
     const app = (0, express_1.default)();
+    const frontendOrigin = normalizeOrigin(config_1.config.frontendUrl);
     app.use((0, cors_1.default)({
-        origin: config_1.config.frontendUrl
+        origin: frontendOrigin
     }));
     app.use('/api/billing/webhook', express_1.default.raw({ type: 'application/json' }));
     app.use(express_1.default.json({ limit: '10mb' }));
