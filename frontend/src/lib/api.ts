@@ -83,7 +83,7 @@ export interface PhotoJob {
   };
 }
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://ai-marketing-production-a569.up.railway.app/api';
 
 export interface AuthUser {
   id: string;
