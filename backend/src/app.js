@@ -25,6 +25,7 @@ const createApp = () => {
         }
     }));
     app.use('/api/billing/webhook', express_1.default.raw({ type: 'application/json' }));
+    app.use('/billing/webhook', express_1.default.raw({ type: 'application/json' }));
     app.use(express_1.default.json({ limit: '10mb' }));
     const staticOptions = {
         acceptRanges: true,
@@ -51,6 +52,9 @@ const createApp = () => {
     app.use('/api/auth', authRoutes_1.default);
     app.use('/api/billing', billingRoutes_1.default);
     app.use('/api', routes_1.default);
+    app.use('/auth', authRoutes_1.default);
+    app.use('/billing', billingRoutes_1.default);
+    app.use('/', routes_1.default);
     app.use((error, _req, res, _next) => {
         const status = error.statusCode || 500;
         res.status(status).json({
