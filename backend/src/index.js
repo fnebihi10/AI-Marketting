@@ -70,9 +70,14 @@ const boot = async () => {
 
 // SIGURIA KONTRA RREZIKUT (Anti-Crash):
 // Nëse dikur në kod ndodh një dështim i fshehtë asinkron (Promise Rejection) që nuk është kapur me try/catch,
-// ky bllok e kap që serveri yt të mos fiket papritur në prodhim.
+// ose një gabim i pakapur në proces (Uncaught Exception) si p.sh. shkëputjet e lidhjeve të jashtme të rrjetit,
+// këto blloqe i kapin ato në mënyrë që serveri të mos fiket papritur.
 process.on('unhandledRejection', (reason, promise) => {
     console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+process.on('uncaughtException', (error) => {
+    console.error('Uncaught Exception caught:', error);
 });
 
 // THIRRJA ZYRTARE E NDIZJES

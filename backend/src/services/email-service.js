@@ -22,35 +22,42 @@ const transporterPromise = (async () => {
         });
     } else {
         // Ambient lokal/testimi: Gjenerojmë një llogari testimi Ethereal me logjikë riprovimi
-        let testAccount;
-        for (let i = 0; i < 3; i++) {
-            try {
-                testAccount = await nodemailer.createTestAccount();
-                break; // Nëse krijohet me sukses, ndalon ciklin
+        try {
+            let testAccount;
+            for (let i = 0; i < 3; i++) {
+                try {
+                    testAccount = await nodemailer.createTestAccount();
+                    break; // Nëse krijohet me sukses, ndalon ciklin
+                }
+                catch (err) {
+                    if (i === 2) throw err; // Nëse dështon edhe herën e tretë, nxjerr gabimin
+                    console.log(`Retrying Ethereal account creation (${i + 1}/3)...`);
+                    await new Promise(r => setTimeout(r, 2000)); // Presim 2 sekonda para riprovimit
+                }
             }
-            catch (err) {
-                if (i === 2) throw err; // Nëse dështon edhe herën e tretë, nxjerr gabimin
-                console.log(`Retrying Ethereal account creation (${i + 1}/3)...`);
-                await new Promise(r => setTimeout(r, 2000)); // Presim 2 sekonda para riprovimit
-            }
+            
+            // Afishojmë kredencialet e testit në terminal që të mund të klikojmë linkun e kontrollit
+            console.log('\n--- [EMAIL SERVICE: ETHEREAL TEST ACCOUNT] ---');
+            console.log(`User: ${testAccount.user}`);
+            console.log(`Pass: ${testAccount.pass}`);
+            console.log('-----------------------------------------------\n');
+            
+            // Kthejmë transportuesin e email-it të testimit
+            return nodemailer.createTransport({
+                host: 'smtp.ethereal.email',
+                port: 587,
+                secure: false,
+                auth: {
+                    user: testAccount.user,
+                    pass: testAccount.pass,
+                },
+            });
         }
-        
-        // Afishojmë kredencialet e testit në terminal që të mund të klikojmë linkun e kontrollit
-        console.log('\n--- [EMAIL SERVICE: ETHEREAL TEST ACCOUNT] ---');
-        console.log(`User: ${testAccount.user}`);
-        console.log(`Pass: ${testAccount.pass}`);
-        console.log('-----------------------------------------------\n');
-        
-        // Kthejmë transportuesin e email-it të testimit
-        return nodemailer.createTransport({
-            host: 'smtp.ethereal.email',
-            port: 587,
-            secure: false,
-            auth: {
-                user: testAccount.user,
-                pass: testAccount.pass,
-            },
-        });
+        catch (error) {
+            console.warn('⚠️ Warning: Failed to create Ethereal test email account. Email sending will be disabled.');
+            console.error(error);
+            return null;
+        }
     }
 })();
 
@@ -60,6 +67,9 @@ const transporterPromise = (async () => {
  */
 const sendEmail = async (options) => {
     const transporter = await transporterPromise;
+    if (!transporter) {
+        throw new Error("Email service is not initialized. Please verify your SMTP settings or network connection.");
+    }
     
     // Përgatitja e strukturës së email-it
     const mailOptions = {
