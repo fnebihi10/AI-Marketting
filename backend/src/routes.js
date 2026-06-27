@@ -448,6 +448,63 @@ router.get('/jobs/download', protect, async (req, res, next) => {
         const customFilename = req.query.filename;
         if (!fileUrl) {
             res.status(400).json({ message: 'URL query parameter is required.' });
+            return;
+        }
+
+        const parsedUrl = new URL(fileUrl);
+        const filename = customFilename || path.basename(parsedUrl.pathname) || 'download';
+
+        if (parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:') {
+            const isLocalhost = parsedUrl.hostname === 'localhost' || 
+                                parsedUrl.hostname === '127.0.0.1' || 
+                                parsedUrl.hostname === req.hostname;
+                                
+            if (isLocalhost) {
+                const storagePrefix = '/storage/';
+                if (!parsedUrl.pathname.startsWith(storagePrefix)) {
+                    res.status(400).json({ message: 'Invalid file URL.' });
+                    return;
+                }
+
+                const relativePath = parsedUrl.pathname.slice(storagePrefix.length);
+                const safePath = path.normalize(relativePath).replace(/^(\.\.(\/|\\))+/, '');
+                
+                let absoluteFilePath = '';
+                if (safePath.startsWith('uploads/')) {
+                    absoluteFilePath = path.join(config.rootDir, 'storage', safePath);
+                } else if (safePath.startsWith('work/')) {
+                    absoluteFilePath = path.join(config.rootDir, 'storage', safePath);
+                } else {
+                    absoluteFilePath = path.join(config.rootDir, 'storage/exports', safePath);
+                }
+
+                const fs = require('node:fs');
+                if (!fs.existsSync(absoluteFilePath)) {
+                    res.status(404).json({ message: 'File not found.' });
+                    return;
+                }
+
+                res.download(absoluteFilePath, filename);
+                return;
+            } else {
+                const response = await fetch(fileUrl);
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch remote file: ${response.statusText}`);
+                }
+                res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+                res.setHeader('Content-Type', response.headers.get('content-type') || 'application/octet-stream');
+                
+                const { Readable } = require('node:stream');
+                Readable.fromWeb(response.body).pipe(res);
+                return;
+            }
+        } else {
+            res.status(400).json({ message: 'Unsupported URL protocol.' });
+        }
+    } catch (error) {
+        next(error);
+    }
+});
 
 /**
  * GET /jobs/:jobId
@@ -701,64 +758,7 @@ router.post('/photo-jobs/:jobId/complete', protect, upload.single('image'), asyn
     }
 });
 
-            return;
-        }
 
-        const parsedUrl = new URL(fileUrl);
-        const filename = customFilename || path.basename(parsedUrl.pathname) || 'download';
-
-        if (parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:') {
-            const isLocalhost = parsedUrl.hostname === 'localhost' || 
-                                parsedUrl.hostname === '127.0.0.1' || 
-                                parsedUrl.hostname === req.hostname;
-                                
-            if (isLocalhost) {
-                const storagePrefix = '/storage/';
-                if (!parsedUrl.pathname.startsWith(storagePrefix)) {
-                    res.status(400).json({ message: 'Invalid file URL.' });
-                    return;
-                }
-
-                const relativePath = parsedUrl.pathname.slice(storagePrefix.length);
-                const safePath = path.normalize(relativePath).replace(/^(\.\.(\/|\\))+/, '');
-                
-                let absoluteFilePath = '';
-                if (safePath.startsWith('uploads/')) {
-                    absoluteFilePath = path.join(config.rootDir, 'storage', safePath);
-                } else if (safePath.startsWith('work/')) {
-                    absoluteFilePath = path.join(config.rootDir, 'storage', safePath);
-                } else {
-                    absoluteFilePath = path.join(config.rootDir, 'storage/exports', safePath);
-                }
-
-                const fs = require('node:fs');
-                if (!fs.existsSync(absoluteFilePath)) {
-                    res.status(404).json({ message: 'File not found.' });
-                    return;
-                }
-
-                res.download(absoluteFilePath, filename);
-                return;
-            } else {
-                // Skedar nga një server i jashtëm (p.sh. S3, Supabase)
-                const response = await fetch(fileUrl);
-                if (!response.ok) {
-                    throw new Error(`Failed to fetch remote file: ${response.statusText}`);
-                }
-                res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-                res.setHeader('Content-Type', response.headers.get('content-type') || 'application/octet-stream');
-                
-                const { Readable } = require('node:stream');
-                Readable.fromWeb(response.body).pipe(res);
-                return;
-            }
-        } else {
-            res.status(400).json({ message: 'Unsupported URL protocol.' });
-        }
-    } catch (error) {
-        next(error);
-    }
-});
 
 // Eksportojmë router-in si moduli default në stilin standard CommonJS
 module.exports = router;
