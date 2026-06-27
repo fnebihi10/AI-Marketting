@@ -17,7 +17,7 @@ const mime = require("mime-types");
 const { VideoJob } = require("./models/VideoJob");
 const { PhotoJob } = require("./models/PhotoJob");
 const { PhotoAd } = require("./models/PhotoAd");
-const User = require("./models/User");
+const { User } = require("./models/User");
 
 // Importimi i Shërbimeve dhe Konfigurimeve të brendshme
 const { config } = require("./config");
