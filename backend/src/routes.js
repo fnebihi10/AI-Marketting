@@ -190,6 +190,7 @@ router.post('/photo-ads', protect, async (req, res, next) => {
         // Gjeneron marketing brief në mënyrë paralele
         const brief = await generateMarketingBrief(prompt, style, productCategory).catch(() => null);
         if (brief) {
+            photoAd.caption = brief.caption;
             photoAd.audience = brief.audience;
             photoAd.offer = brief.offer;
             photoAd.proof = brief.proof;

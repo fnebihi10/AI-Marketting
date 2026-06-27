@@ -250,7 +250,7 @@ function DashboardPage() {
   const handleCopyCaption = () => {
     let textToCopy = '';
     if (creatorMode === 'photo' && selectedPhotoAd) {
-      textToCopy = selectedPhotoAd.prompt;
+      textToCopy = selectedPhotoAd.caption || selectedPhotoAd.prompt;
     } else if (activeJob && activeJob.kind === 'video') {
       const vJob = activeJob as VideoJob;
       textToCopy = vJob.caption || '';
@@ -1188,14 +1188,7 @@ function DashboardPage() {
                               if (!selectedPhotoAd) return 'Select a photo set from history';
                               return (
                                 <>
-                                  <p>{selectedPhotoAd.prompt}</p>
-                                  <div className="photo-caption-tags">
-                                    {(selectedPhotoAd.title || '').split(' ').filter(Boolean).slice(0, 4).map((w: string, i: number) => (
-                                      <span key={i} className="photo-caption-tag">#{w.toLowerCase().replace(/[^a-z0-9]/g, '')}</span>
-                                    ))}
-                                    {selectedPhotoAd.style && <span className="photo-caption-tag">#{selectedPhotoAd.style}</span>}
-                                    <span className="photo-caption-tag">#aimarketing</span>
-                                  </div>
+                                  <p>{selectedPhotoAd.caption || selectedPhotoAd.prompt}</p>
                                 </>
                               );
                             }
@@ -1680,7 +1673,7 @@ function DashboardPage() {
 
                   <div className="fb-post-modal__text-area" contentEditable suppressContentEditableWarning>
                     {(() => {
-                      if (creatorMode === 'photo' && selectedPhotoAd) return selectedPhotoAd.prompt;
+                      if (creatorMode === 'photo' && selectedPhotoAd) return selectedPhotoAd.caption || selectedPhotoAd.prompt;
                       if (activeJob?.kind === 'video') {
                         const vJob = activeJob as VideoJob;
                         return vJob.caption || (vJob.script ? `${vJob.script.hook || vJob.script.title || vJob.description} ${vJob.script.cta}` : activeJob.description);
@@ -1758,7 +1751,7 @@ function DashboardPage() {
                       className="ig-post-modal__caption-input" 
                       placeholder="Write a caption..."
                       defaultValue={(() => {
-                        if (creatorMode === 'photo' && selectedPhotoAd) return selectedPhotoAd.prompt;
+                        if (creatorMode === 'photo' && selectedPhotoAd) return selectedPhotoAd.caption || selectedPhotoAd.prompt;
                         if (activeJob?.kind === 'video') {
                           const vJob = activeJob as VideoJob;
                           return vJob.caption || (vJob.script ? `${vJob.script.hook || vJob.script.title || vJob.description} ${vJob.script.cta}` : activeJob.description);
@@ -1800,7 +1793,7 @@ function DashboardPage() {
                       <label>Caption</label>
                       <textarea 
                         defaultValue={(() => {
-                          if (creatorMode === 'photo' && selectedPhotoAd) return selectedPhotoAd.prompt;
+                          if (creatorMode === 'photo' && selectedPhotoAd) return selectedPhotoAd.caption || selectedPhotoAd.prompt;
                           if (activeJob?.kind === 'video') {
                             const vJob = activeJob as VideoJob;
                             return vJob.caption || (vJob.script ? `${vJob.script.hook || vJob.script.title || vJob.description} ${vJob.script.cta}` : activeJob.description);

@@ -38,6 +38,7 @@ const photoAdSchema = new Schema({
         default: []
     },
     // Fushat për marketing si audienca, oferta dhe dëshmia
+    caption: { type: String, default: '' },
     audience: { type: String, default: '' },
     offer: { type: String, default: '' },
     proof: { type: String, default: '' }

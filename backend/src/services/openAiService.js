@@ -437,8 +437,13 @@ const generateMarketingBrief = async (description, style, productCategory) => {
     const cached = await getCache(cacheKey);
     
     if (cached) return cached;
+
+    const fallbackHashtags = buildRelevantHashtags(description, productCategory);
+    const fallbackCaption = `${description.slice(0, 120)}. Ready to upgrade? ${fallbackHashtags.join(' ')}`;
+
     if (!config.openAiApiKey) {
         return {
+            caption: fallbackCaption,
             audience: `High-intent consumers interested in ${productCategory}`,
             offer: `Premium ${description.slice(0, 20)}... with ${style} aesthetics`,
             proof: `AI-optimized marketing asset for high conversion`
@@ -459,7 +464,7 @@ const generateMarketingBrief = async (description, style, productCategory) => {
             messages: [
                 {
                     role: 'system',
-                    content: 'You are a senior marketing strategist. Extract the core marketing strategy from the provided brief.'
+                    content: 'You are a senior marketing strategist and social media copywriter. Create a marketing strategy and a catchy social media caption for the provided product brief.'
                 },
                 {
                     role: 'user',
@@ -467,8 +472,9 @@ const generateMarketingBrief = async (description, style, productCategory) => {
                         `Description: ${description}`,
                         `Style: ${style}`,
                         `Category: ${productCategory}`,
-                        'Return a JSON object with exactly these keys: "audience", "offer", "proof".',
-                        'Keep each description concise and punchy (10-15 words max).'
+                        'Return a JSON object with exactly these keys: "caption", "audience", "offer", "proof".',
+                        '"caption": A persuasive social media post (hook + CTA) with 4-6 relevant hashtags specific to the product. Do NOT use generic hashtags like #marketing, #ai, #business, #innovation.',
+                        '"audience", "offer", "proof": Keep each concise and punchy (10-15 words max).'
                     ].join('\n')
                 }
             ]
@@ -477,6 +483,7 @@ const generateMarketingBrief = async (description, style, productCategory) => {
 
     if (!response.ok) {
         return {
+            caption: fallbackCaption,
             audience: `Consumers interested in ${productCategory}`,
             offer: `Exclusive ${style} campaign for this product`,
             proof: `Professional quality visual storytelling`
@@ -488,6 +495,7 @@ const generateMarketingBrief = async (description, style, productCategory) => {
     const parsed = parseJson(content);
     
     const result = {
+        caption: normalizeLine(parsed.caption || fallbackCaption),
         audience: normalizeLine(parsed.audience || ''),
         offer: normalizeLine(parsed.offer || ''),
         proof: normalizeLine(parsed.proof || '')
