@@ -1,141 +1,114 @@
-# AI Marketing Studio MVP
+# AI Marketing Studio
 
-AI Marketing Studio turns a product image and short product description into a 30-45 second vertical marketing video built for TikTok, Reels, and Shorts. The backend writes a scene-based script, finds Pexels media, generates Deepgram voiceover with timing metadata, renders animated captioned scenes through FFmpeg, and returns a downloadable MP4.
+Platformë inovative e cila kthen imazhin dhe përshkrimin e një produkti në një video marketingu vertikale 30-45 sekondëshe të gatshme për t'u publikuar në TikTok, Instagram Reels, dhe YouTube Shorts.
 
-## Stack
+---
 
-- Backend: Node.js + Express + TypeScript
-- Frontend: React + Vite + TailwindCSS + Framer Motion
-- Database: MongoDB
-- Queue: BullMQ + Redis
-- AI: OpenAI
-- Voice: Deepgram
-- Media: Pexels with Replicate/Stability fallback
-- Rendering: FFmpeg + fluent-ffmpeg
-- Storage: Local by default, with S3 and Supabase adapters included
+## 2. Përshkrimi (Description)
 
-## Features
+**AI Marketing Studio** është një aplikacion që automatizon krijimin e videove reklamuese për produkte të ndryshme. Qëllimi kryesor është t'u mundësojë bizneseve dhe krijuesve të gjenerojnë reklama video me cilësi të lartë brenda pak minutave pa pasur nevojë për aftësi të montimit të videove. 
 
-- Drag-and-drop landing page for product image upload and product brief entry
-- Real-time generation progress over Server-Sent Events
-- 4-6 scene script structure with hook, body, CTA, and scene search keywords
-- Pexels-first video search with image fallback and optional AI style-transfer fallback
-- Deepgram voiceover caching with alignment metadata and phrase-based captions
-- FFmpeg scene rendering with text overlays, transitions, music ducking, and final MP4 export
-- Trim/export workflow for the rendered video
+Duke u nisur vetëm nga një foto e produktit dhe një përshkrim i shkurtër:
+- **Skenari me Inteligjencë Artificiale**: Backend-i shkruan një skenar të strukturuar në skena me inteligjencë artificiale.
+- **Kërkimi i Mediave**: Gjen automatikisht pamjet më të përshtatshme (video) nga Pexels.
+- **Zëri me AI (Voiceover)**: Gjeneron zërin (voiceover) përmes inteligjencës artificiale me sinkronizim të plotë kohor.
+- **Montimi i Automatizuar (FFmpeg)**: Bashkon dhe monton gjithçka përmes FFmpeg (shton titra të animuar, muzikë në sfond që ulet automatikisht kur flitet, tranzicione).
+- **Shkarkimi**: Ofron videon finale MP4 të gatshme për shkarkim.
 
-## Project Structure
+---
 
-- `backend/` API server, worker, queue, media/voice/render services
-- `frontend/` React generator studio
-- `docker-compose.yml` MongoDB, Redis, backend, worker, frontend
-- `setup.sh` one-click local bootstrap script for Ubuntu/Debian/macOS
+## 3. Teknologjitë e Përdorura
 
-## Environment Setup
+Aplikacioni është i ndërtuar duke përdorur një arkitekturë moderne dhe të shpejtë:
 
-1. Copy `backend/.env.example` to `backend/.env`
-2. Copy `frontend/.env.example` to `frontend/.env`
-3. Fill in these keys:
-   - `OPENAI_API_KEY`
-   - `PEXELS_API_KEY`
-   - Optional experimental image fallbacks: `REPLICATE_API_TOKEN`, `STABILITY_API_KEY`
-   - Optional storage provider keys for S3 or Supabase
+* **Frontend:**
+  - React.js + TypeScript
+  - Vite (për build-im të shpejtë)
+  - TailwindCSS (për stilim premium dhe responsive)
+  - Framer Motion (për mikro-animacione të lëmuara)
 
-## Local Development
+* **Backend:**
+  - Node.js + Express
+  - MongoDB (Databaza për ruajtjen e përdoruesve dhe statusin e gjenerimit të videove)
+  - Redis + BullMQ (për menaxhimin e radhës së punëve asinkrone të gjenerimit të videove)
 
-### One-click setup
+* **Integrimet e AI & Media (API):**
+  - OpenAI (për shkrimin e skenarit inteligjent)
+  - Deepgram (për gjenerimin e zërit realist/TTS dhe sinkronizimin e titrave)
+  - Pexels API (për gjetjen e videove/pamjeve ilustruese)
+  - Stability AI & Replicate (për gjenerimin e imazheve si zgjidhje rezervë nëse mungojnë mediat)
 
+* **Përpunimi i Videove:**
+  - FFmpeg + fluent-ffmpeg (për montimin, prerjen, shtimin e titrave dhe zërit)
+
+---
+
+## 4. Si me e startu projektin (Installation)
+
+Për të nisur projektin në kompjuterin tuaj lokal, ndiqni hapat e mëposhtëm:
+
+### Hapi 1: Klono projektin dhe instalo varësitë (Dependencies)
+Në direktorinë rrënjë (root) të projektit, ekzekutoni:
 ```bash
-chmod +x setup.sh
-./setup.sh
-```
-
-### Manual setup
-
-```bash
+# Instalon varësitë për të gjithë projektin (Backend & Frontend duke përdorur npm workspaces)
 npm install
-npm install --workspace backend
-npm install --workspace frontend
 ```
 
-Start infrastructure:
+### Hapi 2: Konfigurimi i skedarëve `.env`
+Duhet të konfiguroni skedarët e mjedisit në të dyja direktoritë (Backend dhe Frontend):
 
+1. **Për Backend:**
+   - Shkoni tek direktoria `backend` dhe kopjoni `.env.example` në `.env`:
+     ```bash
+     cp backend/.env.example backend/.env
+     ```
+   - Plotësoni çelësat e nevojshëm API në `backend/.env` (si `OPENAI_API_KEY`, `DEEPGRAM_API_KEY`, `PEXELS_API_KEY`).
+   - Për lidhjen me Databazën, vendosni URL-në tuaj të MongoDB tek `MONGODB_URI` (p.sh. MongoDB Atlas siç është caktuar ose databaza lokale `mongodb://127.0.0.1:27017/ai-marketing-studio`).
+
+2. **Për Frontend:**
+   - Shkoni tek direktoria `frontend` dhe kopjoni `.env.example` në `.env`:
+     ```bash
+     cp frontend/.env.example frontend/.env
+     ```
+   - Sigurohuni që adresa e API-t është e saktë (si default është `VITE_API_BASE_URL=http://localhost:5000/api`).
+
+### Hapi 3: Nisja e Databazës dhe Redis (Opsionale përmes Docker)
+Nëse dëshironi të nisni shërbimet e MongoDB dhe Redis lokalisht përmes Docker:
 ```bash
 docker compose up -d mongodb redis
 ```
 
-Start the backend API:
+### Hapi 4: Nisja e Projektit në Zhvillim (Development Mode)
+Mund ta ndizni backend-in dhe frontend-in paralelisht nga direktoria rrënjë (root):
 
-```bash
-npm run dev --workspace backend
-```
+* **Nisja e Backend-it (API):**
+  ```bash
+  npm run dev --workspace backend
+  ```
 
-Start the BullMQ worker:
+* **Nisja e Worker-it (BullMQ):**
+  ```bash
+  npm run worker:dev --workspace backend
+  ```
 
-```bash
-npm run worker:dev --workspace backend
-```
+* **Nisja e Frontend-it:**
+  ```bash
+  npm run dev --workspace frontend
+  ```
 
-Start the frontend:
-
-```bash
-npm run dev --workspace frontend
-```
-
-## FFmpeg Notes
-
-- `FFMPEG_PATH` and `FFPROBE_PATH` can point to system binaries
-- `FFMPEG_FONT_PATH` should point to a bold font file used by `drawtext`
-- The render pipeline assumes portrait output at `1080x1920`, `30fps`, `libx264`, `crf 23`
-
-## Storage Modes
-
-- `STORAGE_PROVIDER=local` stores final exports under `backend/storage/exports`
-- `STORAGE_PROVIDER=s3` uploads to S3-compatible storage
-- `STORAGE_PROVIDER=supabase` uploads to Supabase Storage
-
-## Docker
-
-```bash
-docker compose up --build
-```
-
-Services:
-
+Aplikacioni do të jetë i disponueshëm në:
 - Frontend: `http://localhost:5173`
-- Backend API: `http://localhost:5000/api`
-- MongoDB: `mongodb://localhost:27017`
-- Redis: `redis://localhost:6379`
+- Backend API: `http://localhost:5000`
 
-## Test With Sample Product
+---
 
-Use this brief in the UI:
+## 5. Funksionalitetet kryesore (Key Features)
 
-Product description:
+Përdoruesi mund të kryejë këto veprime në aplikacion:
 
-`A collagen peptide powder for busy women 30+ who want healthier hair and skin without adding another complicated routine. Strawberry flavor, 20 servings, subscribe-and-save available today. The goal is to get first-time buyers to start a subscription.`
-
-Recommended category: `beauty-skincare`
-
-Recommended style: `luxury`
-
-Expected quality checks:
-
-- Hook immediately frames the transformation or pain point
-- Pexels media feels relevant to wellness/beauty lifestyle rather than random stock
-- Voiceover sounds persuasive instead of generic
-- Stock clip duration fits the voice better instead of obviously looping
-- Captions track the spoken phrases closely
-- Final output contains clear CTA and polished end frame
-
-Expected runtime:
-
-- Scripts are generated for 4-6 scenes
-- The generator targets a total runtime of 30-45 seconds
-- Script prompting asks the model not to produce videos shorter than 28 seconds, though final runtime still depends on generated voiceover timing
-
-## Notes
-
-- For background music, set `LOCAL_MUSIC_PATH` to a royalty-free MP3 on disk. The renderer ducks the track under voiceover automatically.
-- Replicate and Stability fallbacks are experimental and should usually stay off unless stock media is unavailable.
-- Generated scripts and voice metadata are cached for 24 hours by default.
+* **Ngarkimi i Produktit (Drag & Drop):** Ngarkim i imazhit të produktit dhe shkrim i një përshkrimi ose udhëzuesi të shkurtër (brief).
+* **Skenarë të Automatizuar me AI**: Krijim i skenarit prej 4-6 skenash të ndara me strukturë profesionale (Hook, Body, CTA).
+* **Ndjekje e Progresit në Kohë Reale**: Shikimi i çdo faze të gjenerimit (skenari, mediat, zëri, renderimi) përmes një ndërfaqeje dinamike në kohë reale.
+* **Titra të Sinkronizuara me Zë**: Zëri me AI dhe titrat moderne me ngjyra përshtaten fjalë për fjalë me njëra-tjetrën.
+* **Muzikë Sfondi me Audio Ducking**: Volumi i muzikës ulet automatikisht sa herë që flet zëri i inteligjencës artificiale.
+* **Player & Shkarkim**: Shikimi i videos së gjeneruar direkt në faqe dhe shkarkimi i saj si skedar MP4 me cilësi të lartë (1080x1920).

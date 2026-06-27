@@ -44,11 +44,6 @@ const config = {
     // 2. Deepgram (për leximin e zërit dhe titrat)
     deepgramApiKey: process.env.DEEPGRAM_API_KEY || '',
     deepgramTtsModel: process.env.DEEPGRAM_TTS_MODEL || 'aura-2-thalia-en',
-    
-    // 3. ElevenLabs
-    elevenLabsApiKey: process.env.ELEVENLABS_API_KEY === 'your_elevenlabs_api_key' ? '' : (process.env.ELEVENLABS_API_KEY || ''),
-    elevenLabsVoiceId: process.env.ELEVENLABS_VOICE_ID || 'JBFqnCBsd6RMkjVDRZzb',
-    elevenLabsModelId: process.env.ELEVENLABS_MODEL_ID || 'eleven_multilingual_v2',
 
     // KËRKIMI DHE GJENERIMI I PAMJEVE VIZUALE
     pexelsApiKey: process.env.PEXELS_API_KEY === 'your_pexels_api_key' ? '' : (process.env.PEXELS_API_KEY || ''),
@@ -57,21 +52,9 @@ const config = {
     replicatePollIntervalMs: Number(process.env.REPLICATE_POLL_INTERVAL_MS || 1500),
     stabilityApiKey: process.env.STABILITY_API_KEY || '',
     stabilityEngineId: process.env.STABILITY_ENGINE_ID || 'stable-diffusion-xl-1024-v1-0',
-    pixabayApiKey: process.env.PIXABAY_API_KEY || '',
 
     // Muzika e gatshme që vendoset në sfond nëse nuk ngarkohet një e re
     localMusicPath: process.env.LOCAL_MUSIC_PATH || path.join(rootDir, 'assets/music/default-bed.mp3'),
-
-    // Konfigurimet e Ruajtjes së Skedarëve (Storage Cloud & Local)
-    storageProvider: process.env.STORAGE_PROVIDER || 'local',
-    s3Bucket: process.env.S3_BUCKET || '',
-    s3Region: process.env.S3_REGION || 'us-east-1',
-    s3AccessKeyId: process.env.S3_ACCESS_KEY_ID || '',
-    s3SecretAccessKey: process.env.S3_SECRET_ACCESS_KEY || '',
-    s3PublicUrl: process.env.S3_PUBLIC_URL || '',
-    supabaseUrl: process.env.SUPABASE_URL || '',
-    supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
-    supabaseBucket: process.env.SUPABASE_BUCKET || '',
 
     // Binaries dhe Shtigjet për FFmpeg
     ffmpegPath: process.env.FFMPEG_PATH || path.join(rootDir, 'bin/ffmpeg.exe'),
