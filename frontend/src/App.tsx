@@ -1493,11 +1493,17 @@ function DashboardPage() {
                       <div className="history-grid">
                         {selectedHistory.map((job) => (
                           <div key={job._id} style={{ position: 'relative' }}>
-                            <button
-                              type="button"
+                            <div
+                              role="button"
+                              tabIndex={0}
                               className={`history-card${selectedJobId === job._id ? ' is-active' : ''}`}
                               onClick={() => handleHistoryCardClick(job)}
-                              style={{ width: '100%' }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  handleHistoryCardClick(job);
+                                }
+                              }}
+                              style={{ width: '100%', cursor: 'pointer', textAlign: 'left', display: 'block' }}
                             >
                               <div className="history-card__top">
                                 <span className="history-card__title">{job.title || job.description || 'Untitled job'}</span>
@@ -1509,7 +1515,7 @@ function DashboardPage() {
                                 </span>
                                 <span className="history-card__note">{job.message || 'Backend job item.'}</span>
                               </div>
-                            </button>
+                            </div>
                             <button
                               className="history-delete-btn"
                               onClick={(e) => handleDeleteJob(job._id, 'job', e)}
@@ -1568,11 +1574,17 @@ function DashboardPage() {
                       <div className="history-grid">
                         {selectedPhotoAds.map((ad) => (
                           <div key={ad._id} style={{ position: 'relative' }}>
-                            <button
-                              type="button"
+                            <div
+                              role="button"
+                              tabIndex={0}
                               className={`history-card${selectedPhotoAdId === ad._id ? ' is-active' : ''}`}
                               onClick={() => handlePhotoCardClick(ad)}
-                              style={{ width: '100%' }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  handlePhotoCardClick(ad);
+                                }
+                              }}
+                              style={{ width: '100%', cursor: 'pointer', textAlign: 'left', display: 'block' }}
                             >
                               <div className="history-card__top">
                                 <span className="history-card__title">{ad.title || 'Untitled photo set'}</span>
@@ -1582,7 +1594,7 @@ function DashboardPage() {
                                 <span className="history-pill history-pill--ready">READY</span>
                                 <span className="history-card__note">{ad.images.length} concepts · {ad.aspectRatio}</span>
                               </div>
-                            </button>
+                            </div>
                             <button
                               className="history-delete-btn"
                               onClick={(e) => handleDeleteJob(ad._id, 'ad', e)}

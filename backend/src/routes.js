@@ -492,12 +492,30 @@ router.delete('/jobs/:jobId', protect, async (req, res, next) => {
         
         let deleted = await VideoJob.findOneAndDelete({ _id: jobId, owner: userId });
         if (!deleted) {
+            // Lejo fshirjen e punëve të vjetra (legacy) pa owner
+            const jobObj = await VideoJob.findById(jobId);
+            if (jobObj && !jobObj.owner) {
+                deleted = await VideoJob.findByIdAndDelete(jobId);
+            }
+        }
+        
+        if (!deleted) {
             deleted = await PhotoJob.findOneAndDelete({ _id: jobId, owner: userId });
         }
         if (!deleted) {
+            // Lejo fshirjen e punëve të vjetra (legacy) pa owner
+            const jobObj = await PhotoJob.findById(jobId);
+            if (jobObj && !jobObj.owner) {
+                deleted = await PhotoJob.findByIdAndDelete(jobId);
+            }
+        }
+        
+        if (!deleted) {
             const ad = await PhotoAd.findById(jobId);
-            if (ad && ad.owner.toString() === userId.toString()) {
-                deleted = await PhotoAd.findByIdAndDelete(jobId);
+            if (ad) {
+                if (!ad.owner || ad.owner.toString() === userId.toString()) {
+                    deleted = await PhotoAd.findByIdAndDelete(jobId);
+                }
             }
         }
         
