@@ -28,7 +28,7 @@ import {
   Users,
   X,
 } from 'lucide-react';
-import logoWhite from './assets/logo-white.png';
+import likoshaniLogo from './assets/likoshani-company.png';
 import { useAuth } from './context/AuthContext';
 import { useTheme } from './context/ThemeContext';
 import type { PhotoJob, VideoJob } from './lib/api';
@@ -671,10 +671,12 @@ function DashboardPage() {
       <aside className="studio-sidebar">
         <div className="studio-sidebar__top">
           <div className="sidebar-brand">
-            <img className="sidebar-logo" src={logoWhite} alt="AI Marketing Studio" />
+            <div className="sidebar-logo-card">
+              <img className="sidebar-logo" src={likoshaniLogo} alt="Likoshani Company" />
+            </div>
             <div className="sidebar-brand__copy">
-              <span>AI Marketing</span>
-              <small>Campaign workspace</small>
+              <span>Likoshani Company</span>
+              <small>AI Marketing Studio</small>
             </div>
           </div>
 

@@ -357,14 +357,16 @@ video {
 
 .app-loader--light {
   background: 
-    radial-gradient(circle at top, rgba(96, 165, 250, 0.12), transparent 34%),
-    linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%);
+    radial-gradient(circle at 50% 35%, rgba(198, 156, 78, 0.12), transparent 24%),
+    radial-gradient(circle at top, rgba(30, 59, 96, 0.12), transparent 42%),
+    #f8fafc;
 }
 
 .app-loader--dark {
   background: 
-    radial-gradient(circle at top, rgba(56, 189, 248, 0.1), transparent 34%),
-    linear-gradient(180deg, #020617 0%, #0f172a 100%);
+    radial-gradient(circle at 50% 35%, rgba(198, 156, 78, 0.14), transparent 25%),
+    radial-gradient(circle at top, rgba(54, 92, 136, 0.2), transparent 45%),
+    linear-gradient(180deg, #071426 0%, #0d1d32 100%);
 }
 
 .app-loader--fade-out {
@@ -385,37 +387,88 @@ video {
   position: relative;
   display: grid;
   place-items: center;
-  width: clamp(7.5rem, 18vw, 10rem);
-  height: clamp(7.5rem, 18vw, 10rem);
+  width: min(78vw, 21rem);
+  aspect-ratio: 1;
 }
 
 .app-loader__glow {
   position: absolute;
-  inset: 12%;
-  border-radius: 999px;
-  background: radial-gradient(circle, rgba(56, 189, 248, 0.28), rgba(14, 165, 233, 0.08) 56%, transparent 76%);
-  filter: blur(18px);
-  animation: app-loader-pulse 1.8s ease-in-out infinite;
+  inset: 13%;
+  border-radius: 28%;
+  background: radial-gradient(circle, rgba(198, 156, 78, 0.22), rgba(30, 59, 96, 0.12) 58%, transparent 78%);
+  filter: blur(24px);
+  animation: app-loader-pulse 2.4s ease-in-out infinite;
 }
 
-.app-loader__logo {
+.app-loader__logo-card {
   position: relative;
   width: 100%;
   height: 100%;
+  overflow: hidden;
+  border: 1px solid rgba(30, 59, 96, 0.1);
+  border-radius: 2rem;
+  background: #ffffff;
+  box-shadow: 0 24px 70px rgba(15, 34, 58, 0.16), 0 0 0 8px rgba(255, 255, 255, 0.52);
+  animation: app-loader-float 2.4s ease-in-out infinite;
+}
+
+.app-loader__logo {
+  width: 100%;
+  height: 100%;
   object-fit: contain;
-  animation: app-loader-float 1.8s ease-in-out infinite;
 }
 
 .app-loader__title {
-  font-size: clamp(1.75rem, 4vw, 2.5rem);
-  font-weight: 800;
-  letter-spacing: -0.04em;
-  color: #0f172a;
+  margin-top: 0.25rem;
+  font-size: clamp(1.35rem, 4vw, 1.85rem);
+  font-weight: 750;
+  letter-spacing: -0.035em;
+  color: #0f2035;
 }
 
 .app-loader__subtitle {
-  font-size: 0.9rem;
-  color: var(--text-muted);
+  margin-top: -0.45rem;
+  font-size: 0.84rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #a47b3e;
+}
+
+.app-loader__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1.1rem;
+  color: #64748b;
+  font-size: 0.78rem;
+}
+
+.app-loader__status-dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: #b58a4a;
+  box-shadow: 0 0 0 5px rgba(181, 138, 74, 0.12);
+  animation: app-loader-pulse 1.6s ease-in-out infinite;
+}
+
+.app-loader--dark .app-loader__title {
+  color: #f8fafc;
+}
+
+.app-loader--dark .app-loader__status {
+  color: #a9b8c9;
+}
+
+@keyframes app-loader-pulse {
+  0%, 100% { opacity: 0.55; transform: scale(0.96); }
+  50% { opacity: 1; transform: scale(1.04); }
+}
+
+@keyframes app-loader-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-7px); }
 }
 
 .studio-page {
@@ -5763,4 +5816,54 @@ video {
   margin-top: 10px !important;
   padding-top: 10px !important;
   gap: 10px !important;
+}
+
+/* Likoshani Company branding */
+.auth-logo-img {
+  width: min(10rem, 48vw);
+  height: auto;
+  margin-bottom: 1rem;
+  border-radius: 1.25rem;
+  filter: drop-shadow(0 12px 24px rgba(15, 34, 58, 0.14));
+}
+
+.sidebar-brand {
+  display: grid;
+  grid-template-columns: 1fr;
+  align-items: start;
+  gap: 12px;
+  padding: 0 4px 10px;
+}
+
+.sidebar-logo-card {
+  width: min(100%, 112px);
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.22);
+}
+
+.sidebar-logo {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain;
+}
+
+.sidebar-brand__copy {
+  display: grid;
+  gap: 3px;
+  padding: 0 0 0 2px;
+}
+
+.sidebar-brand__copy span {
+  color: var(--sidebar-text);
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.sidebar-brand__copy small {
+  color: rgba(245, 239, 230, 0.7);
+  font-size: 0.7rem;
 }

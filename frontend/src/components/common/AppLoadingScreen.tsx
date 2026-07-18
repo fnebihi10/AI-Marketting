@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { useTheme } from '../../context/ThemeContext';
-import logoMark from '../../assets/logo-mark-ui.png';
+import likoshaniLogo from '../../assets/likoshani-company.png';
 
 const LOADER_DURATION_MS = 3200; // Adjusted slightly for better feel
 const LOADER_FADE_MS = 500;
@@ -47,15 +47,21 @@ export default function AppLoadingScreen({ children }: AppLoadingScreenProps) {
           }`}
           role="status"
           aria-live="polite"
-          aria-label="Loading AI Marketing Studio"
+          aria-label="Loading Likoshani Company"
         >
           <div className="app-loader__content">
             <div className="app-loader__logo-wrap">
               <div className="app-loader__glow" />
-              <img src={logoMark} alt="AI Marketing Studio logo" className="app-loader__logo" />
+              <div className="app-loader__logo-card">
+                <img src={likoshaniLogo} alt="Likoshani Company logo" className="app-loader__logo" />
+              </div>
             </div>
-            <div className="app-loader__title">AI Marketing Studio</div>
-            <div className="app-loader__subtitle">Loading AI Experience...</div>
+            <div className="app-loader__title">Likoshani Company</div>
+            <div className="app-loader__subtitle">AI Marketing Studio</div>
+            <div className="app-loader__status">
+              <span className="app-loader__status-dot" aria-hidden="true" />
+              Preparing your workspace
+            </div>
           </div>
         </div>
       ) : null}
