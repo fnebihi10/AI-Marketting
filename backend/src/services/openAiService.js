@@ -32,6 +32,7 @@ const isEsportsBrief = (description, productCategory) => {
 // JSON Schema që detyron OpenAI të kthejë strukturën ekzakte të skenarit
 const scriptSchema = {
     name: 'marketing_video_script',
+    strict: true,
     schema: {
         type: 'object',
         additionalProperties: false,
@@ -228,6 +229,59 @@ const normalizeScriptPackage = (payload) => {
     };
 };
 
+const buildFallbackScript = (description, productCategory) => {
+    const product = description.slice(0, 80);
+    return {
+        title: `Campaign for ${product.slice(0, 30)}`,
+        hook: `See why ${product.slice(0, 48)} deserves a closer look.`,
+        cta: 'Try it today and bring this upgrade into your routine.',
+        hashtags: buildRelevantHashtags(description, productCategory),
+        musicMood: 'Energetic and uplifting',
+        audience: `People looking for a better ${productCategory} solution`,
+        offer: `A simple way to experience ${product.slice(0, 40)}`,
+        proof: 'Built around a clear customer problem, benefit, and action-driven message',
+        caption: `${product}. Ready to make it part of your routine?`,
+        scenes: [
+            {
+                sceneNumber: 1,
+                headline: 'Make the upgrade',
+                voiceover: `Ready for a better ${productCategory} experience? Meet a simple upgrade designed to fit your routine and make every moment count.`,
+                onScreenText: ['Make The Upgrade'],
+                pexelsKeywords: [productCategory, 'product closeup'],
+                visualBrief: 'Energetic product reveal with cinematic lighting',
+                imagePrompt: `Professional marketing shot of ${product}`
+            },
+            {
+                sceneNumber: 2,
+                headline: 'Made for real life',
+                voiceover: `Built for people who want dependable results, this product brings a polished solution to an everyday need.`,
+                onScreenText: ['Made For Real Life'],
+                pexelsKeywords: [productCategory, 'hands using product'],
+                visualBrief: 'Closeup of the product being used in a natural routine',
+                imagePrompt: `Lifestyle product shot of ${product}`
+            },
+            {
+                sceneNumber: 3,
+                headline: 'Feel the difference',
+                voiceover: `From the first use, enjoy a smoother experience, stronger confidence, and a result that feels worth repeating.`,
+                onScreenText: ['Feel The Difference'],
+                pexelsKeywords: ['happy customer', productCategory],
+                visualBrief: 'Customer enjoying the outcome with warm, confident energy',
+                imagePrompt: `Premium lifestyle shot showing the benefit of ${product}`
+            },
+            {
+                sceneNumber: 4,
+                headline: 'Start today',
+                voiceover: `Do not wait for the perfect moment. Make this practical upgrade part of your routine and start today.`,
+                onScreenText: ['Start Today', 'Shop Now'],
+                pexelsKeywords: [productCategory, 'product hero shot'],
+                visualBrief: 'Final hero product frame with a clear call to action',
+                imagePrompt: `Final commercial hero shot of ${product}`
+            }
+        ]
+    };
+};
+
 /**
  * Krijon skenarin e plotë të videos duke komunikuar me Inteligjencën Artificiale të OpenAI
  */
@@ -415,7 +469,13 @@ const generateScriptPackage = async (description, style, productCategory, option
         throw new Error('OpenAI response did not include any content.');
     }
 
-    const parsed = normalizeScriptPackage(parseJson(content));
+    let parsed;
+    try {
+        parsed = normalizeScriptPackage(parseJson(content));
+    } catch (error) {
+        console.error('[OpenAI] Invalid script JSON, using fallback:', error.message);
+        parsed = normalizeScriptPackage(buildFallbackScript(description, productCategory));
+    }
     const relevantHashtags = buildRelevantHashtags(description, productCategory);
     
     parsed.hashtags = parsed.hashtags.length >= 4
