@@ -57,8 +57,10 @@ const config = {
     localMusicPath: process.env.LOCAL_MUSIC_PATH || path.join(rootDir, 'assets/music/default-bed.mp3'),
 
     // Binaries dhe Shtigjet për FFmpeg
-    ffmpegPath: process.env.FFMPEG_PATH || path.join(rootDir, 'bin/ffmpeg.exe'),
-    ffprobePath: process.env.FFPROBE_PATH || path.join(rootDir, 'bin/ffprobe.exe'),
+    // App Platform runs Linux, while local Windows development may use .exe binaries.
+    // Prefer explicitly configured paths, then use the platform's PATH on Linux.
+    ffmpegPath: process.env.FFMPEG_PATH || (process.platform === 'win32' ? path.join(rootDir, 'bin/ffmpeg.exe') : 'ffmpeg'),
+    ffprobePath: process.env.FFPROBE_PATH || (process.platform === 'win32' ? path.join(rootDir, 'bin/ffprobe.exe') : 'ffprobe'),
     ffmpegFontPath: process.env.FFMPEG_FONT_PATH || defaultFontPath,
     cacheTtlHours: Number(process.env.CACHE_TTL_HOURS || 24),
     jobConcurrency: Number(process.env.JOB_CONCURRENCY || 2),

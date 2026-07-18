@@ -33,6 +33,8 @@ const isEsportsBrief = (description, productCategory) => {
 const scriptSchema = {
     name: 'marketing_video_script',
     schema: {
+        type: 'object',
+        additionalProperties: false,
         required: ['title', 'hook', 'cta', 'caption', 'hashtags', 'musicMood', 'audience', 'offer', 'proof', 'scenes'],
         properties: {
             title: { type: 'string' },       // Titulli i fushatës
