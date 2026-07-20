@@ -4,6 +4,11 @@
 const { config } = require("../config");
 const { getCache, setCache } = require("./cacheService");
 const { sha256 } = require("../utils/files");
+const {
+    applyVisualIntentToScene,
+    buildVisualIntent,
+    describeVisualIntent
+} = require("./visualIntentService");
 
 // Një listë me fjalë kyçe të ndaluara sepse janë shumë të përgjithshme
 const blockedKeywordTokens = new Set([
@@ -13,7 +18,7 @@ const blockedKeywordTokens = new Set([
     'technology', 'viral'
 ]);
 
-const SCRIPT_PROMPT_VERSION = 'v5'; // Versioni i prompt-it që i dërgohet AI
+const SCRIPT_PROMPT_VERSION = 'v6'; // Versioni i prompt-it që i dërgohet AI
 
 // Fjalët që tregojnë se reklama ka lidhje me lojërat elektronike (eSports)
 const esportsBriefTokens = [
@@ -182,10 +187,10 @@ const removeGenericHashtagsFromCaption = (caption) => normalizeLine(caption)
 /**
  * Merr objektin e kthyer nga OpenAI dhe e kalon nëpër filtra normalizimi për siguri
  */
-const normalizeScriptPackage = (payload) => {
+const normalizeScriptPackage = (payload, visualIntent = null) => {
     const scenes = (payload.scenes || [])
         .slice(0, 6)
-        .map((scene, index) => ({
+        .map((scene, index) => applyVisualIntentToScene({
             sceneNumber: Number(scene.sceneNumber || index + 1),
             headline: normalizeLine(scene.headline),
             voiceover: normalizeLine(scene.voiceover),
@@ -198,7 +203,7 @@ const normalizeScriptPackage = (payload) => {
                 .filter(Boolean))).slice(0, 4),
             visualBrief: normalizeLine(scene.visualBrief),
             imagePrompt: normalizeLine(scene.imagePrompt)
-        }))
+        }, visualIntent))
         .filter((scene) => scene.headline && scene.voiceover)
         .sort((left, right) => left.sceneNumber - right.sceneNumber)
         .map((scene, index) => ({
@@ -229,8 +234,12 @@ const normalizeScriptPackage = (payload) => {
     };
 };
 
-const buildFallbackScript = (description, productCategory) => {
+const buildFallbackScript = (description, productCategory, visualIntent = null) => {
     const product = description.slice(0, 80);
+    const exactVisual = visualIntent?.visualBrief || `Premium ${productCategory.replace(/-/g, ' ')} product scene`;
+    const exactKeywords = visualIntent?.searchPhrases?.length
+        ? visualIntent.searchPhrases.slice(0, 4)
+        : [productCategory, 'product closeup'];
     return {
         title: `Campaign for ${product.slice(0, 30)}`,
         hook: `See why ${product.slice(0, 48)} deserves a closer look.`,
@@ -247,36 +256,36 @@ const buildFallbackScript = (description, productCategory) => {
                 headline: 'Make the upgrade',
                 voiceover: `Ready for a better ${productCategory} experience? Meet a simple upgrade designed to fit your routine and make every moment count.`,
                 onScreenText: ['Make The Upgrade'],
-                pexelsKeywords: [productCategory, 'product closeup'],
-                visualBrief: 'Energetic product reveal with cinematic lighting',
-                imagePrompt: `Professional marketing shot of ${product}`
+                pexelsKeywords: exactKeywords,
+                visualBrief: exactVisual,
+                imagePrompt: `Professional marketing shot of ${product}. ${exactVisual}`
             },
             {
                 sceneNumber: 2,
                 headline: 'Made for real life',
                 voiceover: `Built for people who want dependable results, this product brings a polished solution to an everyday need.`,
                 onScreenText: ['Made For Real Life'],
-                pexelsKeywords: [productCategory, 'hands using product'],
-                visualBrief: 'Closeup of the product being used in a natural routine',
-                imagePrompt: `Lifestyle product shot of ${product}`
+                pexelsKeywords: exactKeywords,
+                visualBrief: `Closeup of the product being used in a natural routine. ${exactVisual}`,
+                imagePrompt: `Lifestyle product shot of ${product}. ${exactVisual}`
             },
             {
                 sceneNumber: 3,
                 headline: 'Feel the difference',
                 voiceover: `From the first use, enjoy a smoother experience, stronger confidence, and a result that feels worth repeating.`,
                 onScreenText: ['Feel The Difference'],
-                pexelsKeywords: ['happy customer', productCategory],
-                visualBrief: 'Customer enjoying the outcome with warm, confident energy',
-                imagePrompt: `Premium lifestyle shot showing the benefit of ${product}`
+                pexelsKeywords: exactKeywords,
+                visualBrief: `Customer enjoying the outcome with warm, confident energy. ${exactVisual}`,
+                imagePrompt: `Premium lifestyle shot showing the benefit of ${product}. ${exactVisual}`
             },
             {
                 sceneNumber: 4,
                 headline: 'Start today',
                 voiceover: `Do not wait for the perfect moment. Make this practical upgrade part of your routine and start today.`,
                 onScreenText: ['Start Today', 'Shop Now'],
-                pexelsKeywords: [productCategory, 'product hero shot'],
-                visualBrief: 'Final hero product frame with a clear call to action',
-                imagePrompt: `Final commercial hero shot of ${product}`
+                pexelsKeywords: exactKeywords,
+                visualBrief: `Final hero product frame with a clear call to action. ${exactVisual}`,
+                imagePrompt: `Final commercial hero shot of ${product}. ${exactVisual}`
             }
         ]
     };
@@ -286,7 +295,9 @@ const buildFallbackScript = (description, productCategory) => {
  * Krijon skenarin e plotë të videos duke komunikuar me Inteligjencën Artificiale të OpenAI
  */
 const generateScriptPackage = async (description, style, productCategory, options = {}) => {
-    const cacheKey = `script:${SCRIPT_PROMPT_VERSION}:${sha256(`${style}:${productCategory}:${description}`)}`;
+    const visualIntent = options.visualIntent || buildVisualIntent(description, options.visualConstraints || {});
+    const visualGuidance = describeVisualIntent(visualIntent);
+    const cacheKey = `script:${SCRIPT_PROMPT_VERSION}:${sha256(`${style}:${productCategory}:${description}:${visualIntent.cacheKey}`)}`;
     const cached = options.bypassCache ? null : await getCache(cacheKey);
     
     if (cached) return cached;
@@ -310,7 +321,8 @@ const generateScriptPackage = async (description, style, productCategory, option
             'For fitness and wellness ads, prioritize visible movement, training, progress, energy, confidence, and action.',
             'Prefer scenes of people actively working out, training at home, tracking progress, or feeling stronger.',
             'Avoid passive talking-head scenes, generic socializing, meetings, interviews, or equipment-only footage unless the brief explicitly asks for it.',
-            'If the offer is a program or membership, the visuals should still show the transformation journey, not abstract community filler.'
+            'If the offer is a program or membership, the visuals should still show the transformation journey, not abstract community filler.',
+            'When the brief names a gender, exercise, equipment, or place, every scene visualBrief and Pexels keyword list must keep those exact requirements.'
         ].join(' ');
     } else if (productCategory === 'sports-football') {
         categoryGuidance = [
@@ -351,8 +363,10 @@ const generateScriptPackage = async (description, style, productCategory, option
                         'Every response is for a real product advertisement designed to convert on TikTok, Reels, or Shorts.',
                         'Use buyer psychology: hook, pain/desire, product mechanism, proof, offer, CTA.',
                         'Scenes must feel filmable and specific, with visuals that can be searched on stock sites.',
+                        'If the user names a person type, gender, action, object, location, or exclusion, treat it as a hard visual requirement for every scene.',
                         'Never rely on vague stock concepts like innovation, success, social media, marketing, business meeting, abstract background, or generic lifestyle filler unless the product literally requires them.',
                         'Voiceover should sound human, persuasive, concise, and purchase-intent driven.',
+                        visualGuidance ? `Hard visual direction: ${visualGuidance}` : '',
                         categoryGuidance
                     ].join(' ')
                 },
@@ -362,6 +376,10 @@ const generateScriptPackage = async (description, style, productCategory, option
                         `Product description: ${description}`,
                         `Creative style: ${style}`,
                         `Product category: ${productCategory}`,
+                        visualGuidance ? `Hard visual requirements: ${visualGuidance}` : '',
+                        visualIntent.searchPhrases?.length
+                            ? `Preferred exact stock-search phrases: ${visualIntent.searchPhrases.slice(0, 5).join(', ')}`
+                            : '',
                         options.variationSeed ? `Unique creative seed for this run: ${options.variationSeed}` : '',
                         options.avoidSceneBriefs?.length
                             ? `Avoid repeating these previous scene concepts for the same brief/category:\n${options.avoidSceneBriefs
@@ -384,6 +402,7 @@ const generateScriptPackage = async (description, style, productCategory, option
                         'Each scene voiceover should be 18-28 words — long enough to tell the story but punchy enough to convert. Do not write fewer than 15 words per scene.',
                         'On-screen text should highlight claims, benefits, urgency, or offer language that fits a real ad.',
                         'Pexels keywords must describe visible subjects, actions, locations, or product-adjacent moments someone could actually search for.',
+                        'Pexels keywords must preserve all hard visual requirements. For example, if the brief says men deadlifting in a gym, do not use broad keywords like fitness workout, exercise motivation, or gym lifestyle by themselves.',
                         'Prefer product-adjacent lifestyle, hands using product, routines, closeups, textures, packaging moments, and outcome visuals.',
                         'Avoid abstract stock terms and avoid unrelated objects, animals, scenery, or random tech footage.',
                         'Spread the story across all scenes — do not cram everything into scene 1 and phone in the rest.',
@@ -405,60 +424,8 @@ const generateScriptPackage = async (description, style, productCategory, option
     if (!response.ok) {
         const errorText = await response.text();
         console.error('[OpenAI] Request failed:', errorText);
-        console.warn('[OpenAI] Falling back to generic script due to API error.');
-
-        const fallbackHashtags = buildRelevantHashtags(description, productCategory);
-        const fallbackCaption = `${description.slice(0, 120)}. Ready to make it part of your routine? ${fallbackHashtags.join(' ')}`;
-        
-        return normalizeScriptPackage({
-            title: `Campaign for ${description.slice(0, 30)}`,
-            hook: `See why ${description.slice(0, 48)} deserves a closer look.`,
-            cta: `Try it today and bring this upgrade into your routine.`,
-            hashtags: fallbackHashtags,
-            musicMood: 'Energetic and Uplifting',
-            audience: `People looking for a better ${productCategory} solution`,
-            offer: `A simple way to experience ${description.slice(0, 40)}`,
-            proof: 'Built around a clear customer problem, benefit, and action-driven message',
-            caption: fallbackCaption,
-            scenes: [
-                {
-                    sceneNumber: 1,
-                    headline: 'Innovation redefined',
-                    voiceover: `Are you ready to take your ${productCategory} to the next level? Meet the all-new solution designed for your success.`,
-                    onScreenText: ['Innovation Redefined'],
-                    pexelsKeywords: ['technology', 'modern office'],
-                    visualBrief: 'Sleek product reveal with cinematic lighting',
-                    imagePrompt: `Professional marketing shot of ${description}`
-                },
-                {
-                    sceneNumber: 2,
-                    headline: 'Designed for you',
-                    voiceover: `We understand the challenges you face every day. That's why we built this with your specific needs in mind.`,
-                    onScreenText: ['Designed For You'],
-                    pexelsKeywords: ['lifestyle', 'hands working'],
-                    visualBrief: 'Close up of product details and textures',
-                    imagePrompt: `Detail shot of ${description}`
-                },
-                {
-                    sceneNumber: 3,
-                    headline: 'Results',
-                    voiceover: `Join thousands of satisfied customers who have already transformed their lives.`,
-                    onScreenText: ['Results'],
-                    pexelsKeywords: ['happy person', 'success'],
-                    visualBrief: 'Person smiling and using the product',
-                    imagePrompt: `Lifestyle shot of person using ${description}`
-                },
-                {
-                    sceneNumber: 4,
-                    headline: 'Get started now',
-                    voiceover: `Don't wait for tomorrow. Start your journey today and experience the difference for yourself. Click the link to learn more.`,
-                    onScreenText: ['Get Started Now', 'Link In Bio'],
-                    pexelsKeywords: ['city skyline', 'sunrise'],
-                    visualBrief: 'Final product shot with call to action overlay',
-                    imagePrompt: `Final commercial shot of ${description}`
-                }
-            ]
-        });
+        console.warn('[OpenAI] Falling back to visual-aware script due to API error.');
+        return normalizeScriptPackage(buildFallbackScript(description, productCategory, visualIntent), visualIntent);
     }
 
     // Përpunimi i përgjigjes së suksesshme nga OpenAI
@@ -471,10 +438,10 @@ const generateScriptPackage = async (description, style, productCategory, option
 
     let parsed;
     try {
-        parsed = normalizeScriptPackage(parseJson(content));
+        parsed = normalizeScriptPackage(parseJson(content), visualIntent);
     } catch (error) {
         console.error('[OpenAI] Invalid script JSON, using fallback:', error.message);
-        parsed = normalizeScriptPackage(buildFallbackScript(description, productCategory));
+        parsed = normalizeScriptPackage(buildFallbackScript(description, productCategory, visualIntent), visualIntent);
     }
     const relevantHashtags = buildRelevantHashtags(description, productCategory);
     

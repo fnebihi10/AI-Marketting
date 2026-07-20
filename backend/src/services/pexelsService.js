@@ -2,6 +2,11 @@
 
 // Importojmë konfigurimet e sistemit (ku ndodhet pexelsApiKey)
 const { config } = require("../config");
+const {
+    buildVisualIntent,
+    textHasAvoidTerm,
+    textSatisfiesRequiredGroups
+} = require("./visualIntentService");
 
 // Përcaktojmë raportin e ekranit të videos që është vertikale (9:16)
 const TARGET_ASPECT_RATIO = 9 / 16;
@@ -28,13 +33,13 @@ const isEsportsBrief = (description, productCategory) => {
 /**
  * Normalizon frazën e kërkimit për API
  */
-const normalizeQuery = (value) => value
+const normalizeQuery = (value, maxWords = 11) => value
     .replace(/[-_/]+/g, ' ')
     .replace(/[^\w\s]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
     .split(' ')
-    .slice(0, 7)
+    .slice(0, maxWords)
     .join(' ');
 
 /**
@@ -117,10 +122,13 @@ const buildFoodSignals = (description) => {
     return { anchors: [], avoidTerms: [] };
 };
 
-const buildFitnessSignals = (description) => {
+const buildFitnessSignals = (description, visualIntent) => {
     const normalized = description.toLowerCase();
     const anchors = unique([
+        ...(visualIntent?.searchPhrases || []),
         normalized.includes('home') ? 'home workout' : '',
+        normalized.includes('deadlift') || normalized.includes('deadlifting') ? 'man deadlifting barbell gym' : '',
+        normalized.includes('gym') ? 'gym strength training' : '',
         normalized.includes('program') ? 'fitness program workout' : '',
         'fitness workout', 'exercise at home', 'personal training workout', 'fitness transformation', 'workout motivation', 'stronger body workout'
     ]);
@@ -152,10 +160,11 @@ const buildEsportsSignals = (description) => {
 /**
  * Ndërton një listë me fraza kërkimi inteligjente për API duke eliminuar termat e ndaluar
  */
-const buildSearchQueries = ({ scene, productCategory, description }) => {
+const buildSearchQueries = ({ scene, productCategory, description, visualIntent: providedVisualIntent }) => {
+    const visualIntent = providedVisualIntent || buildVisualIntent(description);
     const categoryText = productCategory.replace(/-/g, ' ');
     const foodSignals = productCategory === 'food-dessert' ? buildFoodSignals(description) : null;
-    const fitnessSignals = productCategory === 'fitness-wellness' ? buildFitnessSignals(description) : null;
+    const fitnessSignals = productCategory === 'fitness-wellness' ? buildFitnessSignals(description, visualIntent) : null;
     const footballSignals = productCategory === 'sports-football' ? buildFootballSignals(description) : null;
     const esportsSignals = isEsportsBrief(description, productCategory) ? buildEsportsSignals(description) : null;
     
@@ -166,6 +175,12 @@ const buildSearchQueries = ({ scene, productCategory, description }) => {
     else if (esportsSignals) actionHint = 'esports arena crowd player pc headset keyboard mouse trophy';
 
     const baseQueries = [
+        ...(visualIntent.searchPhrases || []).slice(0, 5).flatMap((phrase) => [
+            phrase,
+            `${phrase} ${scene.visualBrief}`,
+            `${phrase} ${(scene.pexelsKeywords || [])[0] || scene.headline}`
+        ]),
+
         // 1. Kërkime të bazuara në sinjalet kryesore të industrisë (Top 3)
         ...(footballSignals?.anchors || []).slice(0, 3).flatMap((anchor) => [`${anchor} ${scene.visualBrief}`, `${anchor} vertical action`, anchor]),
         ...(foodSignals?.anchors || []).slice(0, 3).flatMap((anchor) => [`${anchor} ${scene.visualBrief}`, `${anchor} close up`, anchor]),
@@ -194,9 +209,14 @@ const buildSearchQueries = ({ scene, productCategory, description }) => {
                 ...(foodSignals?.avoidTerms || []),
                 ...(fitnessSignals?.avoidTerms || []),
                 ...(footballSignals?.avoidTerms || []),
-                ...(esportsSignals?.avoidTerms || [])
+                ...(esportsSignals?.avoidTerms || []),
+                ...(visualIntent.avoidTerms || [])
             ];
-            return avoidTerms.length ? !queryTokens.some((token) => avoidTerms.includes(token)) : true;
+            const hasAvoidTerm = avoidTerms.length
+                ? queryTokens.some((token) => avoidTerms.includes(token)) || textHasAvoidTerm(query, avoidTerms)
+                : false;
+            const satisfiesIntent = !visualIntent.strict || textSatisfiesRequiredGroups(query, visualIntent.requiredGroups);
+            return !hasAvoidTerm && satisfiesIntent;
         })).slice(0, 15); // Limitohet në 15 kërkesat më premtuese
 };
 
@@ -207,21 +227,30 @@ const buildSearchQueries = ({ scene, productCategory, description }) => {
  * 2. Kërkon fillimisht për Video Vertikale në Pexels.
  * 3. Nëse nuk gjendet asnjë video, përdor fotot vertikale si plan rezervë (Fallback).
  */
-const findSceneMedia = async (scene, productCategory, description) => {
+const findSceneMedia = async (scene, productCategory, description, options = {}) => {
     if (!config.pexelsApiKey) {
         return [];
     }
 
-    const queries = buildSearchQueries({ scene, productCategory, description });
+    const visualIntent = options.visualIntent || buildVisualIntent(description, options.visualConstraints || {});
+    const queries = buildSearchQueries({ scene, productCategory, description, visualIntent });
     const selected = [];
     const seen = new Set();
-    const maxResults = 6;
+    const maxResults = visualIntent.strict ? 10 : 6;
+    const queriesToTry = queries.slice(0, visualIntent.strict ? 6 : 8);
+    const perQueryLimit = visualIntent.strict ? 2 : 6;
 
     // 1. Kërkimi për Video Vertikale (Limitohet në 8 kërkesat e para për shpejtësi)
-    for (const query of queries.slice(0, 8)) {
-        const payloads = await Promise.all([
-            pexelsVideoSearch(query, 'portrait'),
-        ]);
+    for (const query of queriesToTry) {
+        let payloads;
+        try {
+            payloads = await Promise.all([
+                pexelsVideoSearch(query, 'portrait'),
+            ]);
+        } catch (error) {
+            console.warn(`[Pexels] Video search failed for "${query}":`, error.message);
+            continue;
+        }
 
         const videos = sortByResolution(payloads
             .flatMap((payload) => payload.videos || [])
@@ -242,7 +271,7 @@ const findSceneMedia = async (scene, productCategory, description) => {
                     query
                 });
                 return items;
-            }, []));
+            }, [])).slice(0, perQueryLimit);
 
         // Sigurohemi që të mos shtohet e njëjta video dy herë
         for (const item of videos) {
@@ -256,7 +285,13 @@ const findSceneMedia = async (scene, productCategory, description) => {
 
     // 2. Fallback: Nëse nuk u gjet asnjë video, kërkojmë Foto Vertikale (Vetëm për 5 kërkesat e para)
     for (const query of queries.slice(0, 5)) {
-        const photoPayload = await pexelsPhotoSearch(query, 'portrait');
+        let photoPayload;
+        try {
+            photoPayload = await pexelsPhotoSearch(query, 'portrait');
+        } catch (error) {
+            console.warn(`[Pexels] Photo search failed for "${query}":`, error.message);
+            continue;
+        }
         const photos = sortByResolution(photoPayload.photos || []).map((photo) => ({
             kind: 'image',
             source: 'pexels',
@@ -283,5 +318,6 @@ const findSceneMedia = async (scene, productCategory, description) => {
 
 // Eksportojmë funksionin në mënyrë standarde të Node.js
 module.exports = {
+    buildSearchQueries,
     findSceneMedia
 };
